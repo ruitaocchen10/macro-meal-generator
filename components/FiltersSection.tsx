@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { Filters } from '../types';
 
 interface FiltersSectionProps {
@@ -16,52 +16,75 @@ const FiltersSection: React.FC<FiltersSectionProps> = ({
   setShowFilters 
 }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Filter className="h-5 w-5 text-blue-500" />
-          <h2 className="text-xl font-semibold text-gray-900">Filters</h2>
+    <div className="relative">
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-600 rounded-3xl blur-xl opacity-20"></div>
+      <div className="relative bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg">
+              <Filter className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Dietary Preferences</h2>
+              <p className="text-slate-600 text-sm">Customize your meal plan</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 rounded-xl font-medium transition-all duration-300 hover:scale-105"
+          >
+            {showFilters ? (
+              <>Hide <ChevronUp className="h-4 w-4" /></>
+            ) : (
+              <>Customize <ChevronDown className="h-4 w-4" /></>
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="text-blue-500 hover:text-blue-600 text-sm font-medium"
-        >
-          {showFilters ? 'Hide' : 'Show'} Filters
-        </button>
+        
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top duration-300">
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-slate-700">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">🍽️</span>
+                  Meal Type Focus
+                </span>
+              </label>
+              <select
+                className="w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300"
+                value={filters.mealType}
+                onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value }))}
+              >
+                <option value="all">All Meal Types</option>
+                <option value="breakfast">Focus on Breakfast</option>
+                <option value="lunch">Focus on Lunch</option>
+                <option value="dinner">Focus on Dinner</option>
+                <option value="snack">Focus on Snacks</option>
+              </select>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-slate-700">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">🌱</span>
+                  Dietary Restrictions
+                </span>
+              </label>
+              <select
+                className="w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300"
+                value={filters.dietary}
+                onChange={(e) => setFilters(prev => ({ ...prev, dietary: e.target.value }))}
+              >
+                <option value="all">No Restrictions</option>
+                <option value="vegetarian">Vegetarian</option>
+                <option value="vegan">Vegan</option>
+                <option value="gluten-free">Gluten-Free</option>
+                <option value="dairy-free">Dairy-Free</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
-      
-      {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Meal Type</label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={filters.mealType}
-              onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value }))}
-            >
-              <option value="all">All Types</option>
-              <option value="breakfast">Breakfast</option>
-              <option value="lunch">Lunch</option>
-              <option value="dinner">Dinner</option>
-              <option value="snack">Snack</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Dietary Preference</label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={filters.dietary}
-              onChange={(e) => setFilters(prev => ({ ...prev, dietary: e.target.value }))}
-            >
-              <option value="all">All Diets</option>
-              <option value="vegetarian">Vegetarian</option>
-              <option value="vegan">Vegan</option>
-              <option value="gluten-free">Gluten-Free</option>
-              <option value="dairy-free">Dairy-Free</option>
-            </select>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
