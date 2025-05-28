@@ -1,3 +1,4 @@
+// components/MealsList.tsx
 import React from 'react';
 import { Search } from 'lucide-react';
 import { Meal, MacroGoals } from '../types';
@@ -9,13 +10,15 @@ interface MealsListProps {
   macroGoals: MacroGoals;
   favorites: number[];
   onToggleFavorite: (mealId: number) => void;
+  planSchedule?: string[];
 }
 
 const MealsList: React.FC<MealsListProps> = ({ 
   meals, 
   macroGoals, 
   favorites, 
-  onToggleFavorite 
+  onToggleFavorite,
+  planSchedule 
 }) => {
   if (meals.length === 0) {
     return (
@@ -28,9 +31,10 @@ const MealsList: React.FC<MealsListProps> = ({
 
   return (
     <div className="space-y-4">
-      {meals.map(meal => {
+      {meals.map((meal, index) => {
         const matchPercentage = getMatchPercentage(meal, macroGoals);
         const isFavorite = favorites.includes(meal.id);
+        const scheduleTime = planSchedule ? planSchedule[index] : null;
         
         return (
           <MealCard
@@ -39,6 +43,7 @@ const MealsList: React.FC<MealsListProps> = ({
             matchPercentage={matchPercentage}
             isFavorite={isFavorite}
             onToggleFavorite={onToggleFavorite}
+            scheduleTime={scheduleTime}
           />
         );
       })}

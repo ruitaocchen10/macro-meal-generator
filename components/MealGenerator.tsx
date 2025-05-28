@@ -1,18 +1,23 @@
+// components/MealGenerator.tsx
 import React, { useState } from 'react';
 import { Wand2, Loader } from 'lucide-react';
 import { MacroGoals, Filters, Meal } from '../types';
-import { generateMeals } from '../utils/smartMealGenerator';
+
+// Test without the import first
+// import { generateMeals, getMealPlanInfo } from '../utils/smartMealGenerator';
 
 interface MealGeneratorProps {
   macroGoals: MacroGoals;
   filters: Filters;
   onMealsGenerated: (meals: Meal[]) => void;
+  onPlanInfoGenerated?: (planInfo: { routine: any; totalMacros: any }) => void;
 }
 
 const MealGenerator: React.FC<MealGeneratorProps> = ({ 
   macroGoals, 
   filters, 
-  onMealsGenerated 
+  onMealsGenerated,
+  onPlanInfoGenerated
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -23,6 +28,8 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
     await new Promise(resolve => setTimeout(resolve, 800));
 
     try {
+      // Temporarily use your old generateMeals function
+      const { generateMeals } = await import('../utils/smartMealGenerator');
       const meals = generateMeals(macroGoals, filters);
       onMealsGenerated(meals);
     } catch (error) {

@@ -1,69 +1,110 @@
+// utils/smartMealGenerator.ts
 import { Meal, MacroGoals, Filters } from '../types';
 
-// Ingredient database with macro info
+// Add new types to your existing types/index.ts
+export interface MealPlan {
+  id: string;
+  name: string;
+  description: string;
+  totalMeals: number;
+  eatingSchedule: string[];
+  meals: Meal[];
+  totalMacros: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+}
+
+export interface EatingRoutine {
+  name: string;
+  description: string;
+  schedule: string[];
+  mealDistribution: {
+    [key: string]: {
+      caloriePercent: number;
+      proteinPercent: number;
+      carbPercent: number;
+      fatPercent: number;
+    };
+  };
+}
+
+// Predefined eating routines
+const eatingRoutines: EatingRoutine[] = [
+  {
+    name: "Classic 3-Meal",
+    description: "Traditional breakfast, lunch, and dinner approach",
+    schedule: ["7:00 AM - Breakfast", "12:30 PM - Lunch", "6:30 PM - Dinner"],
+    mealDistribution: {
+      breakfast: { caloriePercent: 25, proteinPercent: 20, carbPercent: 30, fatPercent: 25 },
+      lunch: { caloriePercent: 35, proteinPercent: 40, carbPercent: 40, fatPercent: 35 },
+      dinner: { caloriePercent: 40, proteinPercent: 40, carbPercent: 30, fatPercent: 40 }
+    }
+  },
+  {
+    name: "Balanced 4-Meal",
+    description: "Three main meals plus one snack for steady energy",
+    schedule: ["7:00 AM - Breakfast", "12:30 PM - Lunch", "3:30 PM - Snack", "7:00 PM - Dinner"],
+    mealDistribution: {
+      breakfast: { caloriePercent: 25, proteinPercent: 20, carbPercent: 30, fatPercent: 25 },
+      lunch: { caloriePercent: 30, proteinPercent: 35, carbPercent: 35, fatPercent: 30 },
+      snack: { caloriePercent: 15, proteinPercent: 15, carbPercent: 20, fatPercent: 15 },
+      dinner: { caloriePercent: 30, proteinPercent: 30, carbPercent: 15, fatPercent: 30 }
+    }
+  },
+  {
+    name: "Athletic 5-Meal",
+    description: "Five smaller meals for optimal nutrient timing",
+    schedule: ["7:00 AM - Breakfast", "10:30 AM - Mid-Morning", "1:00 PM - Lunch", "4:00 PM - Pre-Dinner", "7:30 PM - Dinner"],
+    mealDistribution: {
+      breakfast: { caloriePercent: 20, proteinPercent: 18, carbPercent: 25, fatPercent: 20 },
+      "mid-morning": { caloriePercent: 15, proteinPercent: 25, carbPercent: 15, fatPercent: 15 },
+      lunch: { caloriePercent: 25, proteinPercent: 25, carbPercent: 30, fatPercent: 25 },
+      "pre-dinner": { caloriePercent: 15, proteinPercent: 20, carbPercent: 15, fatPercent: 15 },
+      dinner: { caloriePercent: 25, proteinPercent: 12, carbPercent: 15, fatPercent: 25 }
+    }
+  }
+];
+
+// Your existing ingredient database (enhanced)
 const ingredients = {
   proteins: [
     { name: 'Grilled chicken breast', protein: 7.5, carbs: 0, fat: 1.5, calsPerOz: 45 },
     { name: 'Salmon fillet', protein: 7, carbs: 0, fat: 4, calsPerOz: 60 },
-    { name: 'Greek yogurt', protein: 6, carbs: 4, fat: 0, calsPerCup: 100 },
-    { name: 'Cottage cheese', protein: 12, carbs: 4, fat: 2, calsPerCup: 80 },
-    { name: 'Eggs', protein: 6, carbs: 1, fat: 5, calsPerEgg: 70 },
-    { name: 'Protein powder', protein: 25, carbs: 3, fat: 1, calsPerScoop: 120 },
+    { name: 'Greek yogurt', protein: 6, carbs: 4, fat: 0, calsPerServing: 100, serving: '1 cup' },
+    { name: 'Cottage cheese', protein: 12, carbs: 4, fat: 2, calsPerServing: 80, serving: '1/2 cup' },
+    { name: 'Eggs', protein: 6, carbs: 1, fat: 5, calsPerServing: 70, serving: '1 large' },
+    { name: 'Protein powder', protein: 25, carbs: 3, fat: 1, calsPerServing: 120, serving: '1 scoop' },
     { name: 'Lean ground turkey', protein: 8, carbs: 0, fat: 2, calsPerOz: 50 },
     { name: 'Tuna (canned)', protein: 7, carbs: 0, fat: 0.5, calsPerOz: 35 },
     { name: 'Tofu', protein: 4, carbs: 1, fat: 2, calsPerOz: 35 },
   ],
   carbs: [
-    { name: 'Brown rice', protein: 1, carbs: 11, fat: 0.5, calsPer: 55, unit: '1/3 cup cooked' },
-    { name: 'Quinoa', protein: 2, carbs: 10, fat: 1, calsPer: 55, unit: '1/3 cup cooked' },
-    { name: 'Sweet potato', protein: 1, carbs: 15, fat: 0, calsPer: 65, unit: '1/2 medium' },
-    { name: 'Oats', protein: 2, carbs: 14, fat: 1.5, calsPer: 75, unit: '1/3 cup dry' },
-    { name: 'Whole wheat bread', protein: 2, carbs: 12, fat: 1, calsPer: 65, unit: '1 slice' },
-    { name: 'Banana', protein: 0.5, carbs: 14, fat: 0, calsPer: 60, unit: '1/2 medium' },
-    { name: 'Berries', protein: 0.5, carbs: 8, fat: 0, calsPer: 35, unit: '1/3 cup' },
+    { name: 'Brown rice', protein: 1, carbs: 11, fat: 0.5, calsPerServing: 55, serving: '1/3 cup cooked' },
+    { name: 'Quinoa', protein: 2, carbs: 10, fat: 1, calsPerServing: 55, serving: '1/3 cup cooked' },
+    { name: 'Sweet potato', protein: 1, carbs: 15, fat: 0, calsPerServing: 65, serving: '1/2 medium' },
+    { name: 'Oats', protein: 2, carbs: 14, fat: 1.5, calsPerServing: 75, serving: '1/3 cup dry' },
+    { name: 'Whole wheat bread', protein: 2, carbs: 12, fat: 1, calsPerServing: 65, serving: '1 slice' },
+    { name: 'Banana', protein: 0.5, carbs: 14, fat: 0, calsPerServing: 60, serving: '1/2 medium' },
+    { name: 'Berries', protein: 0.5, carbs: 8, fat: 0, calsPerServing: 35, serving: '1/3 cup' },
   ],
   fats: [
-    { name: 'Avocado', protein: 1, carbs: 2, fat: 7, calsPer: 70, unit: '1/4 medium' },
-    { name: 'Olive oil', protein: 0, carbs: 0, fat: 14, calsPer: 120, unit: '1 tbsp' },
-    { name: 'Almonds', protein: 2, carbs: 2, fat: 5, calsPer: 60, unit: '10 nuts' },
-    { name: 'Almond butter', protein: 2, carbs: 2, fat: 8, calsPer: 95, unit: '1 tbsp' },
-    { name: 'Coconut oil', protein: 0, carbs: 0, fat: 14, calsPer: 120, unit: '1 tbsp' },
-    { name: 'Cheese', protein: 3, carbs: 0.5, fat: 4, calsPer: 50, unit: '2 tbsp shredded' },
+    { name: 'Avocado', protein: 1, carbs: 2, fat: 7, calsPerServing: 70, serving: '1/4 medium' },
+    { name: 'Olive oil', protein: 0, carbs: 0, fat: 14, calsPerServing: 120, serving: '1 tbsp' },
+    { name: 'Almonds', protein: 2, carbs: 2, fat: 5, calsPerServing: 60, serving: '10 nuts' },
+    { name: 'Almond butter', protein: 2, carbs: 2, fat: 8, calsPerServing: 95, serving: '1 tbsp' },
+    { name: 'Coconut oil', protein: 0, carbs: 0, fat: 14, calsPerServing: 120, serving: '1 tbsp' },
+    { name: 'Cheese', protein: 3, carbs: 0.5, fat: 4, calsPerServing: 50, serving: '2 tbsp shredded' },
   ],
   vegetables: [
-    { name: 'Spinach', protein: 1, carbs: 1, fat: 0, calsPer: 10, unit: '1 cup fresh' },
-    { name: 'Broccoli', protein: 1, carbs: 2, fat: 0, calsPer: 15, unit: '1/2 cup' },
-    { name: 'Bell peppers', protein: 0.5, carbs: 3, fat: 0, calsPer: 15, unit: '1/4 cup diced' },
-    { name: 'Cucumber', protein: 0.5, carbs: 2, fat: 0, calsPer: 10, unit: '1/2 cup diced' },
-    { name: 'Asparagus', protein: 1, carbs: 2, fat: 0, calsPer: 15, unit: '1/2 cup' },
-    { name: 'Cherry tomatoes', protein: 0.5, carbs: 2, fat: 0, calsPer: 10, unit: '1/4 cup' },
-  ]
-};
-
-interface MealTemplate {
-  base: string;
-  protein: boolean;
-  carb: boolean;
-  fat: boolean;
-  veggie: boolean;
-}
-
-const mealTemplates: Record<string, MealTemplate[]> = {
-  breakfast: [
-    { base: 'protein', protein: false, carb: true, fat: true, veggie: false },
-    { base: 'carb', protein: true, carb: false, fat: true, veggie: false },
-  ],
-  lunch: [
-    { base: 'protein', protein: false, carb: true, fat: true, veggie: true },
-    { base: 'protein', protein: false, carb: false, fat: true, veggie: true },
-  ],
-  dinner: [
-    { base: 'protein', protein: false, carb: true, fat: true, veggie: true },
-    { base: 'protein', protein: false, carb: true, fat: false, veggie: true },
-  ],
-  snack: [
-    { base: 'protein', protein: false, carb: false, fat: true, veggie: false },
-    { base: 'carb', protein: true, carb: false, fat: true, veggie: false },
+    { name: 'Spinach', protein: 1, carbs: 1, fat: 0, calsPerServing: 10, serving: '1 cup fresh' },
+    { name: 'Broccoli', protein: 1, carbs: 2, fat: 0, calsPerServing: 15, serving: '1/2 cup' },
+    { name: 'Bell peppers', protein: 0.5, carbs: 3, fat: 0, calsPerServing: 15, serving: '1/4 cup diced' },
+    { name: 'Cucumber', protein: 0.5, carbs: 2, fat: 0, calsPerServing: 10, serving: '1/2 cup diced' },
+    { name: 'Asparagus', protein: 1, carbs: 2, fat: 0, calsPerServing: 15, serving: '1/2 cup' },
+    { name: 'Cherry tomatoes', protein: 0.5, carbs: 2, fat: 0, calsPerServing: 10, serving: '1/4 cup' },
   ]
 };
 
@@ -86,157 +127,167 @@ function filterByDietary(ingredientList: any[], dietary: string) {
   return ingredientList.filter(filters[dietary] || (() => true));
 }
 
-function generateMeal(
-    id: number, 
-    type: string, 
-    macroGoals: MacroGoals, 
-    dietary: string
-  ): Meal {
-    const templates = mealTemplates[type];
-    const template = templates[Math.floor(Math.random() * templates.length)];
-    
-    const targetCals = Math.max(200, parseInt(macroGoals.calories) || 400);
-    const targetProtein = Math.max(15, parseInt(macroGoals.protein) || 25);
-    const targetCarbs = Math.max(20, parseInt(macroGoals.carbs) || 30);
-    const targetFat = Math.max(10, parseInt(macroGoals.fat) || 15);
-    
-    let mealIngredients: any[] = [];
-    let totalCals = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
-    
-    // Base ingredient (protein or carb)
-    const baseCategory = template.base === 'protein' ? 'proteins' : 'carbs';
-    const baseOptions = filterByDietary(ingredients[baseCategory as keyof typeof ingredients], dietary);
-    const baseIngredient = baseOptions[Math.floor(Math.random() * baseOptions.length)];
-    
-    // Calculate portion size for base ingredient
-    let baseAmount = 1;
-    if (baseCategory === 'proteins') {
-      baseAmount = Math.max(3, Math.min(8, targetProtein / Math.max(1, baseIngredient.protein)));
-      mealIngredients.push({
-        item: baseIngredient.name,
-        quantity: `${Math.round(baseAmount)} oz`,
-        serving: 'lean'
-      });
-      totalCals += baseAmount * ((baseIngredient as any).calsPerOz || 50);
-      totalProtein += baseAmount * baseIngredient.protein;
-      totalCarbs += baseAmount * baseIngredient.carbs;
-      totalFat += baseAmount * baseIngredient.fat;
-    } else {
-      baseAmount = Math.max(0.5, Math.min(2, targetCarbs / Math.max(1, baseIngredient.carbs)));
-      mealIngredients.push({
-        item: baseIngredient.name,
-        quantity: `${baseAmount.toFixed(1)}x`,
-        serving: (baseIngredient as any).unit || 'serving'
-      });
-      totalCals += baseAmount * ((baseIngredient as any).calsPer || 50);
-      totalProtein += baseAmount * baseIngredient.protein;
-      totalCarbs += baseAmount * baseIngredient.carbs;
-      totalFat += baseAmount * baseIngredient.fat;
-    }
-    
-    // Add other components based on template
-    if (template.protein && baseCategory !== 'proteins') {
-      const proteinOptions = filterByDietary(ingredients.proteins, dietary);
-      const protein = proteinOptions[Math.floor(Math.random() * proteinOptions.length)];
-      const proteinAmount = Math.max(2, Math.min(6, (targetProtein - totalProtein) / Math.max(1, protein.protein)));
-      
-      mealIngredients.push({
-        item: protein.name,
-        quantity: `${Math.round(proteinAmount)} oz`,
-        serving: 'lean'
-      });
-      totalCals += proteinAmount * ((protein as any).calsPerOz || 50);
-      totalProtein += proteinAmount * protein.protein;
-      totalCarbs += proteinAmount * protein.carbs;
-      totalFat += proteinAmount * protein.fat;
-    }
-    
-    if (template.carb && baseCategory !== 'carbs') {
-      const carbOptions = filterByDietary(ingredients.carbs, dietary);
-      const carb = carbOptions[Math.floor(Math.random() * carbOptions.length)];
-      const carbAmount = Math.max(0.5, Math.min(2, (targetCarbs - totalCarbs) / Math.max(1, carb.carbs)));
-      
-      mealIngredients.push({
-        item: carb.name,
-        quantity: `${carbAmount.toFixed(1)}x`,
-        serving: (carb as any).unit || 'serving'
-      });
-      totalCals += carbAmount * ((carb as any).calsPer || 50);
-      totalProtein += carbAmount * carb.protein;
-      totalCarbs += carbAmount * carb.carbs;
-      totalFat += carbAmount * carb.fat;
-    }
-    
-    if (template.fat) {
-      const fatOptions = filterByDietary(ingredients.fats, dietary);
-      const fat = fatOptions[Math.floor(Math.random() * fatOptions.length)];
-      const fatAmount = Math.max(0.5, Math.min(2, (targetFat - totalFat) / Math.max(1, fat.fat)));
-      
-      mealIngredients.push({
-        item: fat.name,
-        quantity: `${fatAmount.toFixed(1)}x`,
-        serving: (fat as any).unit || 'serving'
-      });
-      totalCals += fatAmount * ((fat as any).calsPer || 50);
-      totalProtein += fatAmount * fat.protein;
-      totalCarbs += fatAmount * fat.carbs;
-      totalFat += fatAmount * fat.fat;
-    }
-    
-    if (template.veggie) {
-      const veggieOptions = filterByDietary(ingredients.vegetables, dietary);
-      const veggie = veggieOptions[Math.floor(Math.random() * veggieOptions.length)];
-      
-      mealIngredients.push({
-        item: veggie.name,
-        quantity: '1x',
-        serving: (veggie as any).unit || 'serving'
-      });
-      totalCals += (veggie as any).calsPer || 15;
-      totalProtein += veggie.protein;
-      totalCarbs += veggie.carbs;
-      totalFat += veggie.fat;
-    }
-    
-    // Generate creative meal name
-    const mealNames = {
-      breakfast: ['Power Bowl', 'Morning Fuel', 'Sunrise Special', 'Energy Boost', 'AM Kickstart'],
-      lunch: ['Balance Bowl', 'Midday Refuel', 'Power Lunch', 'Lean & Green', 'Macro Bowl'],
-      dinner: ['Evening Feast', 'Dinner Delight', 'Night Fuel', 'Balanced Plate', 'Complete Meal'],
-      snack: ['Quick Bite', 'Power Snack', 'Mini Meal', 'Energy Boost', 'Macro Snack']
-    };
-    
-    const nameOptions = mealNames[type as keyof typeof mealNames];
-    const baseName = nameOptions[Math.floor(Math.random() * nameOptions.length)];
-    const mainIngredient = mealIngredients[0].item.split(' ')[0];
-    
-    return {
-      id,
-      name: `${mainIngredient} ${baseName}`,
-      type,
-      dietary: dietary === 'all' ? 'none' : dietary,
-      calories: Math.round(totalCals) || 400,
-      protein: Math.round(totalProtein) || 25,
-      carbs: Math.round(totalCarbs) || 30,
-      fat: Math.round(totalFat) || 15,
-      ingredients: mealIngredients
-    };
-  }
+function generateMealForSlot(
+  id: number,
+  mealType: string,
+  targetMacros: { calories: number; protein: number; carbs: number; fat: number },
+  dietary: string
+): Meal {
+  const mealIngredients: any[] = [];
+  let totalCals = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
 
-export function generateMeals(macroGoals: MacroGoals, filters: Filters): Meal[] {
-  const meals: Meal[] = [];
-  const mealTypes = filters.mealType === 'all' 
-    ? ['breakfast', 'lunch', 'dinner', 'snack']
-    : [filters.mealType];
-  
-  const mealsPerType = Math.ceil(8 / mealTypes.length);
-  
-  let id = 1;
-  for (const type of mealTypes) {
-    for (let i = 0; i < mealsPerType && meals.length < 8; i++) {
-      meals.push(generateMeal(id++, type, macroGoals, filters.dietary));
+  // Determine meal structure based on type
+  const mealStructures: { [key: string]: string[] } = {
+    breakfast: ['protein', 'carb', 'fat'],
+    lunch: ['protein', 'carb', 'fat', 'vegetable'],
+    dinner: ['protein', 'carb', 'fat', 'vegetable'],
+    snack: ['protein', 'fat'],
+    "mid-morning": ['protein', 'carb'],
+    "pre-dinner": ['protein', 'carb']
+  };
+
+  const structure = mealStructures[mealType] || ['protein', 'carb', 'fat'];
+
+  // Add ingredients based on structure
+  structure.forEach(macroType => {
+    let categoryKey: keyof typeof ingredients;
+    let targetAmount: number;
+
+    switch (macroType) {
+      case 'protein':
+        categoryKey = 'proteins';
+        targetAmount = targetMacros.protein;
+        break;
+      case 'carb':
+        categoryKey = 'carbs';
+        targetAmount = targetMacros.carbs;
+        break;
+      case 'fat':
+        categoryKey = 'fats';
+        targetAmount = targetMacros.fat;
+        break;
+      case 'vegetable':
+        categoryKey = 'vegetables';
+        targetAmount = 5; // Fixed small amount for vegetables
+        break;
+      default:
+        return;
     }
-  }
+
+    const options = filterByDietary(ingredients[categoryKey], dietary);
+    if (options.length === 0) return;
+
+    const ingredient = options[Math.floor(Math.random() * options.length)];
+    
+    // Calculate serving size
+    let servingMultiplier = 1;
+    const macroKey = macroType === 'carb' ? 'carbs' : macroType;
+    
+    if (macroType !== 'vegetable') {
+      const ingredientMacroValue = ingredient[macroKey as keyof typeof ingredient] as number;
+      if (ingredientMacroValue > 0) {
+        servingMultiplier = Math.max(0.5, Math.min(3, targetAmount / ingredientMacroValue));
+      }
+    }
+
+    // Add to meal
+    const serving = ingredient.serving || (categoryKey === 'proteins' ? 'oz' : 'serving');
+    const quantity = servingMultiplier === 1 ? '1x' : `${servingMultiplier.toFixed(1)}x`;
+    
+    mealIngredients.push({
+      item: ingredient.name,
+      quantity,
+      serving
+    });
+
+    // Calculate macros
+    const calories = servingMultiplier * (ingredient.calsPerServing || ingredient.calsPerOz || 50);
+    totalCals += calories;
+    totalProtein += servingMultiplier * ingredient.protein;
+    totalCarbs += servingMultiplier * ingredient.carbs;
+    totalFat += servingMultiplier * ingredient.fat;
+  });
+
+  // Generate meal name
+  const mealNames: { [key: string]: string[] } = {
+    breakfast: ['Power Breakfast', 'Morning Fuel', 'Sunrise Bowl', 'Energy Start'],
+    lunch: ['Balanced Lunch', 'Midday Refuel', 'Power Bowl', 'Lean Plate'],
+    dinner: ['Evening Feast', 'Dinner Delight', 'Night Fuel', 'Complete Meal'],
+    snack: ['Quick Bite', 'Power Snack', 'Mini Meal', 'Energy Boost'],
+    "mid-morning": ['Morning Boost', 'Pre-Lunch Fuel'],
+    "pre-dinner": ['Afternoon Power', 'Pre-Dinner Bite']
+  };
+
+  const nameOptions = mealNames[mealType] || ['Macro Meal'];
+  const mealName = nameOptions[Math.floor(Math.random() * nameOptions.length)];
+
+  return {
+    id,
+    name: `${mealName}`,
+    type: mealType,
+    dietary: dietary === 'all' ? 'none' : dietary,
+    calories: Math.round(totalCals),
+    protein: Math.round(totalProtein),
+    carbs: Math.round(totalCarbs),
+    fat: Math.round(totalFat),
+    ingredients: mealIngredients
+  };
+}
+
+function selectBestRoutine(macroGoals: MacroGoals): EatingRoutine {
+  const totalCals = parseInt(macroGoals.calories) || 2000;
   
+  // Simple logic to select routine based on calories
+  if (totalCals < 1800) {
+    return eatingRoutines[0]; // 3-meal for lower calories
+  } else if (totalCals < 2500) {
+    return eatingRoutines[1]; // 4-meal for moderate calories
+  } else {
+    return eatingRoutines[2]; // 5-meal for higher calories
+  }
+}
+
+// Updated generateMeals function to create complete meal plan
+export function generateMeals(macroGoals: MacroGoals, filters: Filters): Meal[] {
+  // Select best eating routine
+  const routine = selectBestRoutine(macroGoals);
+  
+  // Parse macro goals
+  const totalCals = parseInt(macroGoals.calories) || 2000;
+  const totalProtein = parseInt(macroGoals.protein) || 150;
+  const totalCarbs = parseInt(macroGoals.carbs) || 200;
+  const totalFat = parseInt(macroGoals.fat) || 65;
+
+  // Generate meals for each slot in the routine
+  const meals: Meal[] = [];
+  let mealId = 1;
+
+  Object.keys(routine.mealDistribution).forEach(mealType => {
+    const distribution = routine.mealDistribution[mealType];
+    
+    const targetMacros = {
+      calories: Math.round(totalCals * distribution.caloriePercent / 100),
+      protein: Math.round(totalProtein * distribution.proteinPercent / 100),
+      carbs: Math.round(totalCarbs * distribution.carbPercent / 100),
+      fat: Math.round(totalFat * distribution.fatPercent / 100)
+    };
+
+    const meal = generateMealForSlot(mealId++, mealType, targetMacros, filters.dietary);
+    meals.push(meal);
+  });
+
   return meals;
+}
+
+// New function to get the meal plan details
+export function getMealPlanInfo(macroGoals: MacroGoals): { routine: EatingRoutine; totalMacros: any } {
+  const routine = selectBestRoutine(macroGoals);
+  const totalMacros = {
+    calories: parseInt(macroGoals.calories) || 0,
+    protein: parseInt(macroGoals.protein) || 0,
+    carbs: parseInt(macroGoals.carbs) || 0,
+    fat: parseInt(macroGoals.fat) || 0
+  };
+  
+  return { routine, totalMacros };
 }

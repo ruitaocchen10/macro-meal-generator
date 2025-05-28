@@ -1,5 +1,6 @@
+// components/MealCard.tsx
 import React from 'react';
-import { Heart } from 'lucide-react';
+import { Heart, Clock } from 'lucide-react';
 import { Meal } from '../types';
 
 interface MealCardProps {
@@ -7,13 +8,15 @@ interface MealCardProps {
   matchPercentage: number | null;
   isFavorite: boolean;
   onToggleFavorite: (mealId: number) => void;
+  scheduleTime?: string | null;
 }
 
 const MealCard: React.FC<MealCardProps> = ({ 
   meal, 
   matchPercentage, 
   isFavorite, 
-  onToggleFavorite 
+  onToggleFavorite,
+  scheduleTime 
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -27,9 +30,20 @@ const MealCard: React.FC<MealCardProps> = ({
               </span>
             )}
           </div>
+          
+          {/* Schedule Time */}
+          {scheduleTime && (
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-blue-500" />
+              <span className="text-sm text-blue-600 font-medium">{scheduleTime}</span>
+            </div>
+          )}
+          
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <span className="capitalize bg-gray-100 px-2 py-1 rounded">{meal.type}</span>
-            <span className="capitalize bg-gray-100 px-2 py-1 rounded">{meal.dietary}</span>
+            {meal.dietary !== 'none' && (
+              <span className="capitalize bg-green-100 text-green-800 px-2 py-1 rounded">{meal.dietary}</span>
+            )}
           </div>
         </div>
         <button
@@ -45,7 +59,7 @@ const MealCard: React.FC<MealCardProps> = ({
       </div>
 
       {/* Macros */}
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-4 mb-4 bg-gray-50 rounded-lg p-3">
         <div className="text-center">
           <div className="text-2xl font-bold text-gray-900">{meal.calories}</div>
           <div className="text-sm text-gray-500">Calories</div>
@@ -69,9 +83,9 @@ const MealCard: React.FC<MealCardProps> = ({
         <h4 className="font-medium text-gray-900 mb-2">Ingredients:</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {meal.ingredients.map((ingredient, index) => (
-            <div key={index} className="text-sm text-gray-600">
-              <span className="font-medium">{ingredient.quantity}</span> {ingredient.item} 
-              <span className="text-gray-400"> ({ingredient.serving})</span>
+            <div key={index} className="text-sm text-gray-600 bg-white rounded p-2 border">
+              <span className="font-medium">{ingredient.quantity}</span> {ingredient.item}
+              <span className="text-gray-400 block text-xs">({ingredient.serving})</span>
             </div>
           ))}
         </div>
