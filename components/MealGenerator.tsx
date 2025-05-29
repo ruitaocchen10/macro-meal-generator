@@ -1,13 +1,14 @@
-// components/MealGenerator.tsx (Enhanced Version)
+// components/MealGenerator.tsx (AI-First Version)
 import React, { useState } from 'react';
 import { Wand2, Loader, ChefHat, Calendar, Target, Brain, MessageSquare } from 'lucide-react';
 import { MacroGoals, Filters, Meal } from '../types';
+import { generateAIMeals } from '../utils/aiMealGenerator';
 import { generateMeals, getMealPlanInfo } from '../utils/smartMealGenerator';
 
 interface MealGeneratorProps {
   macroGoals: MacroGoals;
   filters: Filters;
-  favoriteFoods?: string[];
+  favoriteFoods?: string[]; // Now accepts text preferences instead of food IDs
   onMealsGenerated: (meals: Meal[]) => void;
   onPlanInfoGenerated?: (planInfo: { routine: any; totalMacros: any }) => void;
 }
@@ -15,58 +16,31 @@ interface MealGeneratorProps {
 const MealGenerator: React.FC<MealGeneratorProps> = ({ 
   macroGoals, 
   filters, 
-  favoriteFoods = [],
+  favoriteFoods = [], // This is now text preferences
   onMealsGenerated,
   onPlanInfoGenerated
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [useAI, setUseAI] = useState(false);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [generationMethod, setGenerationMethod] = useState<'ai' | 'standard'>('ai');
 
   // Check if AI is available
-  const hasAI = process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
+  const hasAI = !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
 
-  const generateStandardMeals = async () => {
+  const generateAIFirst = async (prompt?: string) => {
     setIsGenerating(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      const meals = generateMeals(macroGoals, filters, favoriteFoods);
+      console.log('🤖 Attempting AI generation...');
+      
+      // Try AI generation first
+      const meals = await generateAIMeals(macroGoals, filters, favoriteFoods, prompt);
       const planInfo = getMealPlanInfo(macroGoals);
       
-      onMealsGenerated(meals);
-      if (onPlanInfoGenerated) {
-        onPlanInfoGenerated(planInfo);
-      }
-    } catch (error) {
-      console.error('Error generating meals:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateAIMeals = async (prompt?: string) => {
-    if (!hasAI) {
-      generateStandardMeals();
-      return;
-    }
-
-    setIsGenerating(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    try {
-      // Dynamic import of AI functions
-      const { generateAIMeals, generateMealsWithPrompt } = await import('../utils/aiMealGenerator');
+      console.log('✅ AI generation successful!', meals);
       
-      let meals: Meal[];
-      if (prompt) {
-        meals = await generateMealsWithPrompt(macroGoals, filters, favoriteFoods, prompt);
-      } else {
-        meals = await generateAIMeals(macroGoals, filters, favoriteFoods);
-      }
-      
-      const planInfo = getMealPlanInfo(macroGoals);
       onMealsGenerated(meals);
       if (onPlanInfoGenerated) {
         onPlanInfoGenerated(planInfo);
@@ -77,18 +51,59 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
         setCustomPrompt('');
         setShowCustomPrompt(false);
       }
+
     } catch (error) {
-      console.error('Error generating AI meals:', error);
+      console.error('❌ AI generation failed, using fallback:', error);
+      
       // Fallback to standard generation
-      generateStandardMeals();
+      try {
+        const meals = generateMeals(macroGoals, filters, favoriteFoods);
+        const planInfo = getMealPlanInfo(macroGoals);
+        
+        console.log('✅ Fallback generation successful!', meals);
+        
+        onMealsGenerated(meals);
+        if (onPlanInfoGenerated) {
+          onPlanInfoGenerated(planInfo);
+        }
+        
+        setGenerationMethod('standard');
+      } catch (fallbackError) {
+        console.error('❌ Both AI and fallback failed:', fallbackError);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateStandardMeals = async () => {
+    setIsGenerating(true);
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    try {
+      console.log('🔧 Using standard generation...');
+      
+      const meals = generateMeals(macroGoals, filters, favoriteFoods);
+      const planInfo = getMealPlanInfo(macroGoals);
+      
+      console.log('✅ Standard generation successful!', meals);
+      
+      onMealsGenerated(meals);
+      if (onPlanInfoGenerated) {
+        onPlanInfoGenerated(planInfo);
+      }
+      
+      setGenerationMethod('standard');
+    } catch (error) {
+      console.error('❌ Standard generation failed:', error);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleGenerate = () => {
-    if (useAI && hasAI) {
-      generateAIMeals();
+    if (hasAI) {
+      generateAIFirst();
     } else {
       generateStandardMeals();
     }
@@ -96,7 +111,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
 
   const handleCustomGenerate = () => {
     if (customPrompt.trim()) {
-      generateAIMeals(customPrompt);
+      generateAIFirst(customPrompt);
     }
   };
 
@@ -108,7 +123,9 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
     "High-protein muscle building",
     "Comfort food that fits macros",
     "Asian fusion cuisine",
-    "Meal prep friendly options"
+    "Meal prep friendly options",
+    "Low-carb keto style",
+    "Plant-based protein focus"
   ];
 
   return (
@@ -118,34 +135,48 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
         <div className="text-center">
           <div className="flex items-center justify-center gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg">
-              {useAI && hasAI ? (
+              {hasAI ? (
                 <Brain className="h-10 w-10 text-white" />
               ) : (
                 <ChefHat className="h-10 w-10 text-white" />
               )}
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">
-              {useAI && hasAI ? 'AI-Powered' : 'Smart'} Meal Generator
-            </h2>
+            <div className="text-left">
+              <h2 className="text-3xl font-bold text-slate-900">
+                {hasAI ? 'AI-Powered' : 'Smart'} Meal Generator
+              </h2>
+              <p className="text-slate-600">
+                {hasAI ? 'Intelligent meal creation with infinite variety' : 'Curated meal combinations'}
+              </p>
+            </div>
           </div>
 
-          {/* AI Toggle (only show if API key is available) */}
+          {/* Generation Method Indicator */}
           {hasAI && (
             <div className="flex items-center justify-center gap-3 mb-6">
-              <span className="text-slate-600">Standard</span>
-              <button
-                onClick={() => setUseAI(!useAI)}
-                className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${
-                  useAI ? 'bg-indigo-500' : 'bg-slate-300'
-                }`}
-              >
-                <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform duration-300 ${
-                  useAI ? 'translate-x-7' : 'translate-x-0'
-                }`}></div>
-              </button>
-              <span className="text-slate-600 flex items-center gap-1">
-                AI Enhanced <Brain className="h-4 w-4" />
-              </span>
+              <div className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                generationMethod === 'ai' 
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700' 
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  <span className="font-medium">AI Generation</span>
+                  {generationMethod === 'ai' && <span className="text-xs">✨ Active</span>}
+                </div>
+              </div>
+              
+              <div className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                generationMethod === 'standard' 
+                  ? 'border-amber-400 bg-amber-50 text-amber-700' 
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <ChefHat className="h-4 w-4" />
+                  <span className="font-medium">Standard</span>
+                  {generationMethod === 'standard' && <span className="text-xs">🔧 Fallback</span>}
+                </div>
+              </div>
             </div>
           )}
 
@@ -154,24 +185,28 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <Calendar className="h-6 w-6 text-blue-500 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 mb-1">Smart Planning</h3>
-              <p className="text-sm text-gray-600">Optimized meal timing and distribution</p>
+              <p className="text-sm text-gray-600">
+                {hasAI ? 'AI calculates optimal meal distribution' : 'Optimized meal timing and distribution'}
+              </p>
             </div>
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <Target className="h-6 w-6 text-green-500 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 mb-1">Macro Precision</h3>
-              <p className="text-sm text-gray-600">Meals calculated to hit your exact goals</p>
+              <p className="text-sm text-gray-600">
+                {hasAI ? 'AI targets within 5% accuracy' : 'Meals calculated to hit your exact goals'}
+              </p>
             </div>
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              {useAI && hasAI ? (
+              {hasAI ? (
                 <Brain className="h-6 w-6 text-purple-500 mx-auto mb-2" />
               ) : (
                 <ChefHat className="h-6 w-6 text-purple-500 mx-auto mb-2" />
               )}
               <h3 className="font-semibold text-gray-900 mb-1">
-                {useAI && hasAI ? 'AI Creativity' : 'Smart Recipes'}
+                {hasAI ? 'Infinite Variety' : 'Smart Recipes'}
               </h3>
               <p className="text-sm text-gray-600">
-                {useAI && hasAI ? 'Creative, personalized meal ideas' : 'Detailed ingredients and portions'}
+                {hasAI ? 'Unlimited meal combinations and cuisines' : 'Detailed ingredients and portions'}
               </p>
             </div>
           </div>
@@ -191,22 +226,22 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
             {isGenerating ? (
               <>
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-white"></div>
-                Creating Your Plan...
+                {hasAI ? 'AI Creating Your Plan...' : 'Creating Your Plan...'}
               </>
             ) : (
               <>
-                {useAI && hasAI ? (
+                {hasAI ? (
                   <Brain className="h-7 w-7 group-hover:scale-110 transition-transform duration-300" />
                 ) : (
                   <Wand2 className="h-7 w-7 group-hover:rotate-12 transition-transform duration-300" />
                 )}
-                Generate {useAI && hasAI ? 'AI' : 'Smart'} Meal Plan
+                Generate {hasAI ? 'AI' : 'Smart'} Meal Plan
               </>
             )}
           </button>
 
-          {/* Custom AI Prompt (only show if AI is enabled) */}
-          {useAI && hasAI && (
+          {/* Custom AI Prompt (only show if AI is available) */}
+          {hasAI && (
             <div className="mt-8 border-t border-slate-200 pt-6">
               <button
                 onClick={() => setShowCustomPrompt(!showCustomPrompt)}
@@ -246,10 +281,23 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
                     disabled={!customPrompt.trim() || isGenerating}
                     className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Generate Custom Plan
+                    Generate Custom AI Plan
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Manual Standard Generation (for testing) */}
+          {hasAI && (
+            <div className="mt-4">
+              <button
+                onClick={generateStandardMeals}
+                disabled={isGenerating || !hasValidGoals}
+                className="text-sm px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+              >
+                🔧 Use Standard Generation (Fallback)
+              </button>
             </div>
           )}
 
