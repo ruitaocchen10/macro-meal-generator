@@ -6,7 +6,7 @@ export interface MacroGoals {
 }
 
 export interface Filters {
-  mealType: string;
+  cookingTime: string;
   dietary: string;
 }
 

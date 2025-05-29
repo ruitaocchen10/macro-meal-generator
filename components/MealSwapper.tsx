@@ -1,15 +1,15 @@
-// components/MealSwapper.tsx (Enhanced Version)
+// components/MealSwapper.tsx (AI-Only Version)
 import React, { useState } from 'react';
 import { RefreshCw, ChevronDown, ChevronUp, Shuffle, ThumbsDown, Zap } from 'lucide-react';
 import { Meal, MacroGoals, Filters } from '../types';
-import { generateMeals } from '../utils/smartMealGenerator';
+import { generateAIMeals } from '../utils/aiMealGenerator';
 
 interface MealSwapperProps {
   currentMeal: Meal;
   mealIndex: number;
   macroGoals: MacroGoals;
   filters: Filters;
-  favoriteFoods: string[]; // Now accepts text preferences instead of food IDs
+  favoriteFoods: string[];
   onMealSwap: (mealIndex: number, newMeal: Meal) => void;
 }
 
@@ -18,7 +18,7 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
   mealIndex,
   macroGoals,
   filters,
-  favoriteFoods, // This is now text preferences
+  favoriteFoods,
   onMealSwap
 }) => {
   const [showAlternatives, setShowAlternatives] = useState(false);
@@ -29,37 +29,24 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
     setIsLoading(true);
     
     try {
-      // Try AI generation first
+      console.log('🤖 Generating AI alternatives...');
       const allAlternatives: Meal[] = [];
       
-      try {
-        // Use AI meal generation with text preferences
-        const { generateAIMeals } = await import('../utils/aiMealGenerator');
-        
-        // Generate 4 different AI meal plans to get variety
-        for (let i = 0; i < 4; i++) {
-          const newMeals = await generateAIMeals(macroGoals, filters, favoriteFoods); // favoriteFoods is now text preferences
-          const sameMealType = newMeals.find(meal => meal.type === currentMeal.type);
-          if (sameMealType && sameMealType.name !== currentMeal.name) {
+      // Generate multiple AI meal plans to get variety
+      for (let i = 0; i < 4; i++) {
+        try {
+          const newMeals = await generateAIMeals(macroGoals, filters, favoriteFoods);
+          const sameMealType = newMeals.find(meal => 
+            meal.type === currentMeal.type && meal.name !== currentMeal.name
+          );
+          if (sameMealType) {
             allAlternatives.push({
               ...sameMealType,
               id: Date.now() + i // Unique ID for alternatives
             });
           }
-        }
-      } catch (aiError) {
-        console.log('AI alternatives failed, using fallback');
-        // Fallback to standard generation
-        const { generateMeals } = await import('../utils/smartMealGenerator');
-        for (let i = 0; i < 4; i++) {
-          const newMeals = generateMeals(macroGoals, filters, []); // Empty array for standard generation
-          const sameMealType = newMeals.find(meal => meal.type === currentMeal.type);
-          if (sameMealType && sameMealType.name !== currentMeal.name) {
-            allAlternatives.push({
-              ...sameMealType,
-              id: Date.now() + i
-            });
-          }
+        } catch (error) {
+          console.log(`AI generation attempt ${i + 1} failed:`, error);
         }
       }
       
@@ -71,6 +58,10 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
         .slice(0, 3);
       
       setAlternatives(uniqueAlternatives);
+      
+      if (uniqueAlternatives.length === 0) {
+        console.log('No alternatives generated');
+      }
     } catch (error) {
       console.error('Error generating alternatives:', error);
     } finally {
@@ -90,13 +81,27 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
     setShowAlternatives(false);
   };
 
-  const handleQuickReplace = () => {
-    generateAlternatives().then(() => {
-      // Auto-select first alternative if available
-      if (alternatives.length > 0) {
-        handleSwapMeal(alternatives[0]);
+  const handleQuickReplace = async () => {
+    setIsLoading(true);
+    try {
+      const newMeals = await generateAIMeals(macroGoals, filters, favoriteFoods);
+      const replacement = newMeals.find(meal => 
+        meal.type === currentMeal.type && meal.name !== currentMeal.name
+      );
+      
+      if (replacement) {
+        handleSwapMeal(replacement);
+      } else {
+        // If no same-type replacement, use first meal
+        if (newMeals.length > 0) {
+          handleSwapMeal(newMeals[0]);
+        }
       }
-    });
+    } catch (error) {
+      console.error('Quick replace error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getMacroDifference = (newMeal: Meal) => {
@@ -126,10 +131,14 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
         <button
           onClick={handleQuickReplace}
           disabled={isLoading}
-          className="group flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium"
+          className="group flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium disabled:opacity-50"
         >
-          <ThumbsDown className="h-4 w-4 group-hover:scale-110 transition-transform" />
-          Don't Like
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+          ) : (
+            <ThumbsDown className="h-4 w-4 group-hover:scale-110 transition-transform" />
+          )}
+          {isLoading ? 'Generating...' : 'Don\'t Like'}
         </button>
 
         {/* Swap Options Button */}
@@ -151,12 +160,12 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
       {showAlternatives && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-10 animate-in slide-in-from-top duration-200 min-w-96">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-slate-900">Alternative {currentMeal.type}s</h4>
+            <h4 className="font-semibold text-slate-900">AI Alternative {currentMeal.type}s</h4>
             <div className="flex items-center gap-2">
               <button
                 onClick={generateAlternatives}
                 disabled={isLoading}
-                className="p-1 text-slate-500 hover:text-slate-700 transition-colors"
+                className="p-1 text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50"
                 title="Refresh alternatives"
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -173,7 +182,7 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
           {isLoading ? (
             <div className="text-center py-6">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto"></div>
-              <p className="text-sm text-slate-500 mt-3">Finding perfect alternatives...</p>
+              <p className="text-sm text-slate-500 mt-3">AI creating perfect alternatives...</p>
             </div>
           ) : alternatives.length > 0 ? (
             <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -193,9 +202,9 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">
                             <Zap className="h-3 w-3 inline mr-1" />
-                            Smart Match
+                            AI Generated
                           </span>
-                          {alternative.dietary !== 'none' && (
+                          {alternative.dietary !== 'none' && alternative.dietary !== 'ai-generated' && (
                             <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">
                               {alternative.dietary}
                             </span>
@@ -234,6 +243,13 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
                       {alternative.ingredients.slice(0, 3).map(ing => ing.item).join(', ')}
                       {alternative.ingredients.length > 3 && '...'}
                     </div>
+
+                    {/* Show AI-specific features if available */}
+                    {(alternative as any).description && (
+                      <div className="mt-2 text-xs text-indigo-600 bg-indigo-50 rounded-lg p-2">
+                        <span className="font-medium">AI Description:</span> {(alternative as any).description}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -241,12 +257,12 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
           ) : (
             <div className="text-center py-6">
               <Shuffle className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm text-slate-500 mb-3">No alternatives found. Try refreshing for more options.</p>
+              <p className="text-sm text-slate-500 mb-3">No AI alternatives found. Try refreshing for more options.</p>
               <button
                 onClick={generateAlternatives}
                 className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg text-sm font-medium transition-colors"
               >
-                Generate Alternatives
+                Generate AI Alternatives
               </button>
             </div>
           )}
@@ -254,7 +270,7 @@ const MealSwapper: React.FC<MealSwapperProps> = ({
           <div className="mt-4 pt-3 border-t border-slate-200">
             <p className="text-xs text-slate-500 flex items-center gap-1">
               <Zap className="h-3 w-3" />
-              <strong>Auto-rebalancing:</strong> Swapping will adjust your other meals to maintain daily targets
+              <strong>AI-Powered:</strong> All alternatives are freshly generated by AI to match your preferences
             </p>
           </div>
         </div>

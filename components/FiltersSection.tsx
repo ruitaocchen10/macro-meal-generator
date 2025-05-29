@@ -46,21 +46,27 @@ const FiltersSection: React.FC<FiltersSectionProps> = ({
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-slate-700">
                 <span className="flex items-center gap-2">
-                  <span className="text-lg">🍽️</span>
-                  Meal Type Focus
+                  <span className="text-lg">⏱️</span>
+                  Cooking Time Preference
                 </span>
               </label>
-              <select
-                className="w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300"
-                value={filters.mealType}
-                onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value }))}
-              >
-                <option value="all">All Meal Types</option>
-                <option value="breakfast">Focus on Breakfast</option>
-                <option value="lunch">Focus on Lunch</option>
-                <option value="dinner">Focus on Dinner</option>
-                <option value="snack">Focus on Snacks</option>
-              </select>
+              <div className="relative">
+                <select
+                  className="w-full px-4 py-3 pr-10 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300 appearance-none"
+                  value={filters.cookingTime}
+                  onChange={(e) => setFilters(prev => ({ ...prev, cookingTime: e.target.value }))}
+                >
+                  <option value="any">Any Time</option>
+                  <option value="quick">Quick (Under 15 min)</option>
+                  <option value="medium">Medium (15-30 min)</option>
+                  <option value="extended">Extended (30+ min)</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
             
             <div className="space-y-3">
@@ -70,17 +76,24 @@ const FiltersSection: React.FC<FiltersSectionProps> = ({
                   Dietary Restrictions
                 </span>
               </label>
-              <select
-                className="w-full px-4 py-3 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300"
-                value={filters.dietary}
-                onChange={(e) => setFilters(prev => ({ ...prev, dietary: e.target.value }))}
-              >
-                <option value="all">No Restrictions</option>
-                <option value="vegetarian">Vegetarian</option>
-                <option value="vegan">Vegan</option>
-                <option value="gluten-free">Gluten-Free</option>
-                <option value="dairy-free">Dairy-Free</option>
-              </select>
+              <div className="relative">
+                <select
+                  className="w-full px-4 py-3 pr-10 bg-white rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 text-slate-900 font-medium hover:border-slate-300 appearance-none"
+                  value={filters.dietary}
+                  onChange={(e) => setFilters(prev => ({ ...prev, dietary: e.target.value }))}
+                >
+                  <option value="all">No Restrictions</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="gluten-free">Gluten-Free</option>
+                  <option value="dairy-free">Dairy-Free</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
         )}
