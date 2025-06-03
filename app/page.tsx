@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { MacroGoals, Filters, Meal } from '../types';
 import { generateAIMeals } from '../utils/aiMealGenerator';
-import MacroGoalsInput from '../components/MacroGoalsInput';
+import MacroCalculator from '../components/MacroCalculator';
 import FiltersSection from '../components/FiltersSection';
 import TextPreferences from '../components/TextPreferences';
 import MealGenerator from '../components/MealGenerator';
 import MealSwapper from '../components/MealSwapper';
-import { Clock, TrendingUp, Target, Calendar, Utensils, Sparkles, BarChart3, CheckCircle, Dumbbell } from 'lucide-react';
+import { Target, Utensils, Sparkles, BarChart3, CheckCircle } from 'lucide-react';
 
 const MacroMealGenerator = () => {
   const [macroGoals, setMacroGoals] = useState<MacroGoals>({
@@ -28,16 +28,9 @@ const MacroMealGenerator = () => {
   const [foodPreferences, setFoodPreferences] = useState<string[]>([]);
   const [generatedMeals, setGeneratedMeals] = useState<Meal[]>([]);
   const [planInfo, setPlanInfo] = useState<{ totalMeals: number; routine: { name: string; description: string } } | null>(null);
-  const [currentDayType, setCurrentDayType] = useState<'training' | 'rest'>('training');
-  const [baseMacroGoals, setBaseMacroGoals] = useState<MacroGoals>({
-    calories: '',
-    protein: '',
-    carbs: '',
-    fat: ''
-  });
-  const [isGenerating, setIsGenerating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [macrosCalculated, setMacrosCalculated] = useState(false);
 
   // Helper functions
   const getMealCount = (calories: string) => {
@@ -51,7 +44,7 @@ const MacroMealGenerator = () => {
       totalMeals: mealCount,
       routine: {
         name: `${mealCount}-Meal Plan`,
-        description: "AI-optimized meal distribution for your goals"
+        description: "Personalized meal distribution for your goals"
       }
     };
   };
@@ -74,6 +67,12 @@ const MacroMealGenerator = () => {
   useEffect(() => {
     localStorage.setItem('food-preferences', JSON.stringify(foodPreferences));
   }, [foodPreferences]);
+
+  const handleMacrosCalculated = (calculatedMacros: MacroGoals) => {
+    setMacroGoals(calculatedMacros);
+    setMacrosCalculated(true);
+    showSuccessMessage('Macros calculated! Ready to generate your meal plan 🎯');
+  };
 
   const handleMealsGenerated = (meals: Meal[]) => {
     setGeneratedMeals(meals);
@@ -103,39 +102,6 @@ const MacroMealGenerator = () => {
       console.error('Error generating meal plan:', error);
       showSuccessMessage('Unable to generate new plan. Please try again.');
     }
-  };
-
-  const handleMacroAdjustment = async (adjustedMacros: MacroGoals, dayType: 'training' | 'rest') => {
-    setMacroGoals(adjustedMacros);
-    setCurrentDayType(dayType);
-    
-    // If there are existing meals, regenerate with new macros
-    if (generatedMeals.length > 0) {
-      try {
-        const meals = await generateAIMeals(adjustedMacros, filters, foodPreferences);
-        const info = createPlanInfo(adjustedMacros);
-        setGeneratedMeals(meals);
-        setPlanInfo(info);
-      } catch (error) {
-        console.error('Error adjusting plan:', error);
-      }
-    }
-  };
-
-  const handleLeftoverAdded = (leftover: any) => {
-    console.log('Leftover added:', leftover);
-    showSuccessMessage('Leftover integration feature coming soon! 🚀');
-  };
-
-  const handlePlanAdjustedForLeftovers = (adjustedMeals: Meal[]) => {
-    setGeneratedMeals(adjustedMeals);
-    showSuccessMessage('Plan adjusted to account for your leftovers!');
-  };
-
-  // Enhanced macro goals handler
-  const handleMacroGoalsChange = (goals: MacroGoals) => {
-    setBaseMacroGoals(goals);
-    setMacroGoals(goals);
   };
 
   // Quick meal replacement
@@ -223,18 +189,18 @@ const MacroMealGenerator = () => {
             </h1>
           </div>
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-medium mb-6 sm:mb-8 px-4">
-            Create personalized meal plans with AI-powered nutrition optimization
+            Get personalized nutrition targets and AI-generated meal plans based on your goals
           </p>
           
           {/* Trust Indicators */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-sm">
             <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
               <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-              <span className="text-emerald-700 font-medium">🏛️ USDA Verified Data</span>
+              <span className="text-emerald-700 font-medium">🏛️ Science-Based Calculations</span>
             </div>
             <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-blue-700 font-medium">🤖 AI-Powered</span>
+              <span className="text-blue-700 font-medium">🤖 AI-Powered Meals</span>
             </div>
             <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl">
               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -244,125 +210,66 @@ const MacroMealGenerator = () => {
         </div>
 
         <div className="space-y-6 sm:space-y-8">
-          {/* Macro Goals Input */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-3xl blur-xl opacity-20"></div>
-            <div className="relative bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-4 sm:p-6 lg:p-8">
-              <div className="flex items-center gap-3 mb-6 sm:mb-8">
-                <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
-                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Your Daily Macro Goals</h2>
-                  <p className="text-slate-600 text-sm sm:text-base">Enter your daily nutrition targets</p>
-                </div>
-              </div>
-              
-              <MacroGoalsInput 
-                macroGoals={baseMacroGoals} 
-                setMacroGoals={handleMacroGoalsChange}
-              />
-            </div>
-          </div>
+          {/* Macro Calculator */}
+          <MacroCalculator onMacrosCalculated={handleMacrosCalculated} />
 
-          {/* Training Day Adjuster */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 bg-gradient-to-br ${currentDayType === 'training' ? 'from-emerald-500 to-emerald-600' : 'from-blue-500 to-blue-600'} rounded-xl shadow-lg`}>
-                  <Dumbbell className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+          {/* Show calculated macros summary */}
+          {macrosCalculated && (
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-4 sm:p-6 border border-emerald-200">
+              <h3 className="font-semibold text-emerald-900 mb-3 flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Your Calculated Daily Targets
+              </h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-white rounded-lg border border-emerald-200">
+                  <div className="text-lg font-bold text-slate-900">{macroGoals.calories}</div>
+                  <div className="text-xs text-slate-500">Calories</div>
                 </div>
-                <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">Training Day Optimizer</h2>
-                  <p className="text-slate-600 text-sm">Adjust macros based on your activity level</p>
+                <div className="text-center p-3 bg-white rounded-lg border border-blue-200">
+                  <div className="text-lg font-bold text-blue-600">{macroGoals.protein}g</div>
+                  <div className="text-xs text-slate-500">Protein</div>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                  <div className="text-lg font-bold text-green-600">{macroGoals.carbs}g</div>
+                  <div className="text-xs text-slate-500">Carbs</div>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg border border-amber-200">
+                  <div className="text-lg font-bold text-amber-600">{macroGoals.fat}g</div>
+                  <div className="text-xs text-slate-500">Fat</div>
                 </div>
               </div>
             </div>
-
-            {/* Day Type Toggle */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <button
-                onClick={() => {
-                  setCurrentDayType('training');
-                  const adjustedMacros = {
-                    calories: Math.round((parseInt(baseMacroGoals.calories) || 0) * 1.1).toString(),
-                    protein: Math.round((parseInt(baseMacroGoals.protein) || 0) * 1.2).toString(),
-                    carbs: Math.round((parseInt(baseMacroGoals.carbs) || 0) * 1.3).toString(),
-                    fat: Math.round((parseInt(baseMacroGoals.fat) || 0) * 0.9).toString()
-                  };
-                  handleMacroAdjustment(adjustedMacros, 'training');
-                }}
-                className={`p-4 sm:p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-105 ${
-                  currentDayType === 'training'
-                    ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-lg'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
-                }`}
-              >
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl mb-2">💪</div>
-                  <h3 className={`font-bold text-base sm:text-lg mb-1 ${currentDayType === 'training' ? 'text-emerald-900' : 'text-slate-900'}`}>
-                    Training Day
-                  </h3>
-                  <p className={`text-sm ${currentDayType === 'training' ? 'text-emerald-700' : 'text-slate-600'}`}>
-                    Higher carbs and calories for performance
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  setCurrentDayType('rest');
-                  const adjustedMacros = {
-                    calories: Math.round((parseInt(baseMacroGoals.calories) || 0) * 0.95).toString(),
-                    protein: Math.round((parseInt(baseMacroGoals.protein) || 0) * 1.1).toString(),
-                    carbs: Math.round((parseInt(baseMacroGoals.carbs) || 0) * 0.8).toString(),
-                    fat: Math.round((parseInt(baseMacroGoals.fat) || 0) * 1.1).toString()
-                  };
-                  handleMacroAdjustment(adjustedMacros, 'rest');
-                }}
-                className={`p-4 sm:p-6 rounded-2xl border-2 transition-all duration-300 hover:scale-105 ${
-                  currentDayType === 'rest'
-                    ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
-                }`}
-              >
-                <div className="text-center">
-                  <div className="text-2xl sm:text-3xl mb-2">🧘</div>
-                  <h3 className={`font-bold text-base sm:text-lg mb-1 ${currentDayType === 'rest' ? 'text-blue-900' : 'text-slate-900'}`}>
-                    Rest Day
-                  </h3>
-                  <p className={`text-sm ${currentDayType === 'rest' ? 'text-blue-700' : 'text-slate-600'}`}>
-                    Optimized for recovery with balanced macros
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
+          )}
           
-          <FiltersSection 
-            filters={filters} 
-            setFilters={setFilters} 
-            showFilters={showFilters} 
-            setShowFilters={setShowFilters} 
-          />
+          {/* Only show filters and preferences after macros are calculated */}
+          {macrosCalculated && (
+            <>
+              <FiltersSection 
+                filters={filters} 
+                setFilters={setFilters} 
+                showFilters={showFilters} 
+                setShowFilters={setShowFilters} 
+              />
 
-          <TextPreferences
-            preferences={foodPreferences}
-            onPreferencesChange={setFoodPreferences}
-            showPreferences={showPreferences}
-            setShowPreferences={setShowPreferences}
-          />
+              <TextPreferences
+                preferences={foodPreferences}
+                onPreferencesChange={setFoodPreferences}
+                showPreferences={showPreferences}
+                setShowPreferences={setShowPreferences}
+              />
 
-          {/* Always show MealGenerator - no auto-generation */}
-          <div className="mb-8">
-            <MealGenerator 
-              macroGoals={macroGoals}
-              filters={filters}
-              favoriteFoods={foodPreferences}
-              onMealsGenerated={handleMealsGenerated}
-              onPlanInfoGenerated={handlePlanInfoGenerated}
-            />
-          </div>
+              {/* Meal Generator */}
+              <div className="mb-8">
+                <MealGenerator 
+                  macroGoals={macroGoals}
+                  filters={filters}
+                  favoriteFoods={foodPreferences}
+                  onMealsGenerated={handleMealsGenerated}
+                  onPlanInfoGenerated={handlePlanInfoGenerated}
+                />
+              </div>
+            </>
+          )}
 
           {/* Daily Meal Plan */}
           {planInfo && generatedMeals.length > 0 && (
@@ -421,7 +328,7 @@ const MacroMealGenerator = () => {
                 </div>
               </div>
 
-              {/* Meal Plan - Mobile Responsive */}
+              {/* Meal Plan */}
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
                   <h3 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
@@ -451,7 +358,7 @@ const MacroMealGenerator = () => {
                       {/* Mobile-First Responsive Card */}
                       <div className="relative bg-gradient-to-br from-white to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 hover:border-slate-300 transition-all duration-300 hover:shadow-lg">
                         
-                        {/* Header - Mobile Stacked, Desktop Flex */}
+                        {/* Header */}
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-3">
@@ -462,7 +369,7 @@ const MacroMealGenerator = () => {
                               <h5 className="text-lg sm:text-xl font-semibold text-indigo-600 break-words">{meal.name}</h5>
                             </div>
                             
-                            {/* Tags - Mobile Stacked */}
+                            {/* Tags */}
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                               <span className="px-2 sm:px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs sm:text-sm font-medium capitalize">
                                 {meal.type}
@@ -475,7 +382,7 @@ const MacroMealGenerator = () => {
                             </div>
                           </div>
                           
-                          {/* Action Buttons - Mobile Full Width */}
+                          {/* Action Buttons */}
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 w-full sm:w-auto">
                             <button
                               onClick={() => handleQuickMealReplace(index)}
@@ -499,7 +406,7 @@ const MacroMealGenerator = () => {
                           </div>
                         </div>
 
-                        {/* Macro Grid - Responsive */}
+                        {/* Macro Grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6 bg-white rounded-xl p-3 sm:p-4 border border-slate-100">
                           {[
                             { label: 'Calories', value: meal.calories, color: 'slate' },
@@ -518,14 +425,13 @@ const MacroMealGenerator = () => {
                           ))}
                         </div>
 
-                        {/* Ingredients Section - Mobile Optimized */}
+                        {/* Ingredients Section */}
                         <div>
                           <h5 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
                             <Utensils className="h-4 w-4 text-slate-600" />
                             Ingredients
                           </h5>
                           
-                          {/* Single Column on Mobile, Two Columns on Desktop */}
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                             {meal.ingredients.map((ingredient, ingredientIndex) => (
                               <div key={ingredientIndex} className="flex items-start gap-3 p-3 bg-white rounded-lg sm:rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
@@ -546,7 +452,7 @@ const MacroMealGenerator = () => {
                             ))}
                           </div>
 
-                          {/* Cooking Instructions - Mobile Friendly */}
+                          {/* Cooking Instructions */}
                           {(meal as any).instructions && (
                             <div className="mt-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
                               <h6 className="font-medium text-blue-900 mb-2 text-sm">🍳 Instructions:</h6>
@@ -571,7 +477,7 @@ const MacroMealGenerator = () => {
                   ))}
                 </div>
 
-                {/* AI Features Info - Mobile Responsive */}
+                {/* AI Features Info */}
                 <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                     <h4 className="font-semibold text-indigo-900 flex items-center gap-2 text-sm sm:text-base">
@@ -603,19 +509,19 @@ const MacroMealGenerator = () => {
                   <div className="bg-white/50 rounded-xl p-3 sm:p-4 border border-indigo-200">
                     <h5 className="font-medium text-indigo-900 mb-2 flex items-center gap-2 text-sm">
                       <CheckCircle className="h-4 w-4" />
-                      Nutrition Data You Can Trust
+                      Science-Based Nutrition Calculations
                     </h5>
                     <p className="text-indigo-700 text-xs mb-3">
-                      AI-generated meals use verified nutritional data to ensure accuracy for your health goals.
+                      Your macros are calculated using proven formulas and adjusted based on your specific goals and activity level.
                     </p>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
                       <div className="flex items-center gap-1">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                        <span className="text-emerald-700">USDA database</span>
+                        <span className="text-emerald-700">Mifflin-St Jeor equation</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        <span className="text-blue-700">AI-optimized</span>
+                        <span className="text-blue-700">Goal-based adjustments</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
