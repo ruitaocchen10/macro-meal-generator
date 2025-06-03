@@ -35,50 +35,50 @@ const MacroCalculator: React.FC<MacroCalculatorProps> = ({ onMacrosCalculated })
     {
       value: 'sedentary',
       label: 'Sedentary',
-      description: 'Desk job, no exercise',
+      description: 'Little to no exercise, desk job',
       multiplier: 1.2
     },
     {
       value: 'lightly_active',
       label: 'Lightly Active', 
-      description: 'Light exercise 1-3 days/week',
-      multiplier: 1.375
+      description: 'Light exercise 1-2 days/week (walking, gentle yoga)',
+      multiplier: 1.3
+    },
+    {
+      value: 'somewhat_active',
+      label: 'Somewhat Active',
+      description: 'Light exercise 2-3 days/week (regular walks, casual gym)', 
+      multiplier: 1.4
     },
     {
       value: 'moderately_active',
       label: 'Moderately Active',
-      description: 'Moderate exercise 3-5 days/week', 
+      description: 'Moderate exercise 3-4 days/week (gym sessions, sports)',
       multiplier: 1.55
+    },
+    {
+      value: 'active',
+      label: 'Active',
+      description: 'Exercise 4-5 days/week (consistent training routine)',
+      multiplier: 1.65
     },
     {
       value: 'very_active',
       label: 'Very Active',
-      description: 'Hard exercise 6-7 days/week',
-      multiplier: 1.725
+      description: 'Intense exercise 5-6 days/week (serious fitness enthusiast)',
+      multiplier: 1.75
     },
     {
       value: 'extremely_active',
       label: 'Extremely Active',
-      description: 'Very hard exercise + physical job',
+      description: 'Intense daily exercise or physical job + exercise',
       multiplier: 1.9
     },
     {
-      value: 'athlete_twice_daily',
-      label: 'Athlete (2x Daily)',
-      description: 'Training twice per day',
-      multiplier: 2.0
-    },
-    {
-      value: 'athlete_heavy',
-      label: 'Heavy Training Athlete',
-      description: 'Multiple daily sessions + competition',
+      value: 'professional_athlete',
+      label: 'Professional Athlete',
+      description: 'Multiple daily training sessions, competition level',
       multiplier: 2.2
-    },
-    {
-      value: 'manual_labor_athlete',
-      label: 'Manual Labor + Training',
-      description: 'Physical job + intense training',
-      multiplier: 2.4
     }
   ];
 
@@ -141,15 +141,6 @@ const MacroCalculator: React.FC<MacroCalculatorProps> = ({ onMacrosCalculated })
       calorieAdjustment: 750,
       category: 'gain', 
       macros: { protein: 0.20, fat: 0.25, carbs: 0.55 }
-    },
-    // Body Recomposition
-    {
-      value: 'recomposition',
-      label: 'Body Recomposition',
-      description: 'Lose fat + gain muscle',
-      calorieAdjustment: -200,
-      category: 'recomp',
-      macros: { protein: 0.35, fat: 0.25, carbs: 0.40 }
     }
   ];
 
@@ -227,8 +218,7 @@ const MacroCalculator: React.FC<MacroCalculatorProps> = ({ onMacrosCalculated })
   const goalsByCategory = {
     loss: goals.filter(g => g.category === 'loss'),
     maintain: goals.filter(g => g.category === 'maintain'), 
-    gain: goals.filter(g => g.category === 'gain'),
-    recomp: goals.filter(g => g.category === 'recomp')
+    gain: goals.filter(g => g.category === 'gain')
   };
 
   return (
@@ -418,27 +408,6 @@ const MacroCalculator: React.FC<MacroCalculatorProps> = ({ onMacrosCalculated })
                         stats.goal === goal.value
                           ? 'border-green-400 bg-green-50 shadow-lg'
                           : 'border-slate-200 bg-white hover:border-green-300'
-                      }`}
-                    >
-                      <div className="font-semibold text-slate-900">{goal.label}</div>
-                      <div className="text-sm text-slate-600 mt-1">{goal.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Body Recomposition */}
-              <div>
-                <h4 className="font-medium text-purple-800 mb-3 text-sm">🎯 Body Recomposition</h4>
-                <div className="grid grid-cols-1 gap-3">
-                  {goalsByCategory.recomp.map((goal) => (
-                    <button
-                      key={goal.value}
-                      onClick={() => setStats(prev => ({ ...prev, goal: goal.value }))}
-                      className={`p-4 text-left rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
-                        stats.goal === goal.value
-                          ? 'border-purple-400 bg-purple-50 shadow-lg'
-                          : 'border-slate-200 bg-white hover:border-purple-300'
                       }`}
                     >
                       <div className="font-semibold text-slate-900">{goal.label}</div>

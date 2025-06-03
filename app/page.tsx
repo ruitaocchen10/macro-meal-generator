@@ -26,11 +26,13 @@ const MacroMealGenerator = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [foodPreferences, setFoodPreferences] = useState<string[]>([]);
+  const [foodExclusions, setFoodExclusions] = useState<string[]>([]);
   const [generatedMeals, setGeneratedMeals] = useState<Meal[]>([]);
   const [planInfo, setPlanInfo] = useState<{ totalMeals: number; routine: { name: string; description: string } } | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [macrosCalculated, setMacrosCalculated] = useState(false);
+  const [replacingMealIndex, setReplacingMealIndex] = useState<number | null>(null);
 
   // Helper functions
   const getMealCount = (calories: string) => {
@@ -55,11 +57,16 @@ const MacroMealGenerator = () => {
     setTimeout(() => setShowSuccessAlert(false), 4000);
   };
 
-  // Load preferences from localStorage
+  // Load preferences and exclusions from localStorage
   useEffect(() => {
     const savedPreferences = localStorage.getItem('food-preferences');
     if (savedPreferences) {
       setFoodPreferences(JSON.parse(savedPreferences));
+    }
+
+    const savedExclusions = localStorage.getItem('food-exclusions');
+    if (savedExclusions) {
+      setFoodExclusions(JSON.parse(savedExclusions));
     }
   }, []);
 
@@ -67,6 +74,11 @@ const MacroMealGenerator = () => {
   useEffect(() => {
     localStorage.setItem('food-preferences', JSON.stringify(foodPreferences));
   }, [foodPreferences]);
+
+  // Save exclusions to localStorage
+  useEffect(() => {
+    localStorage.setItem('food-exclusions', JSON.stringify(foodExclusions));
+  }, [foodExclusions]);
 
   const handleMacrosCalculated = (calculatedMacros: MacroGoals) => {
     setMacroGoals(calculatedMacros);
@@ -92,7 +104,7 @@ const MacroMealGenerator = () => {
 
   const handleGenerateNewPlan = async () => {
     try {
-      const meals = await generateAIMeals(macroGoals, filters, foodPreferences);
+      const meals = await generateAIMeals(macroGoals, filters, foodPreferences, foodExclusions);
       const info = createPlanInfo(macroGoals);
       
       setGeneratedMeals(meals);
@@ -104,11 +116,12 @@ const MacroMealGenerator = () => {
     }
   };
 
-  // Quick meal replacement
+  // Quick meal replacement with loading state
   const handleQuickMealReplace = async (mealIndex: number) => {
+    setReplacingMealIndex(mealIndex);
     try {
       // Generate new meals and pick one of the same type
-      const newMeals = await generateAIMeals(macroGoals, filters, foodPreferences);
+      const newMeals = await generateAIMeals(macroGoals, filters, foodPreferences, foodExclusions);
       const currentMeal = generatedMeals[mealIndex];
       const replacement = newMeals.find(meal => 
         meal.type === currentMeal.type && meal.name !== currentMeal.name
@@ -122,6 +135,8 @@ const MacroMealGenerator = () => {
     } catch (error) {
       console.error('Quick replace error:', error);
       showSuccessMessage('Unable to find replacement. Please try again.');
+    } finally {
+      setReplacingMealIndex(null);
     }
   };
 
@@ -253,7 +268,9 @@ const MacroMealGenerator = () => {
 
               <TextPreferences
                 preferences={foodPreferences}
+                exclusions={foodExclusions}
                 onPreferencesChange={setFoodPreferences}
+                onExclusionsChange={setFoodExclusions}
                 showPreferences={showPreferences}
                 setShowPreferences={setShowPreferences}
               />
@@ -264,6 +281,7 @@ const MacroMealGenerator = () => {
                   macroGoals={macroGoals}
                   filters={filters}
                   favoriteFoods={foodPreferences}
+                  excludedFoods={foodExclusions}
                   onMealsGenerated={handleMealsGenerated}
                   onPlanInfoGenerated={handlePlanInfoGenerated}
                 />
@@ -386,11 +404,26 @@ const MacroMealGenerator = () => {
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 w-full sm:w-auto">
                             <button
                               onClick={() => handleQuickMealReplace(index)}
-                              className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium"
+                              disabled={replacingMealIndex === index}
+                              className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:scale-100"
                               title="Generate new meal"
                             >
-                              <span className="text-sm">🔄</span>
-                              Replace
+                              {replacingMealIndex === index ? (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 relative">
+                                      <div className="absolute inset-0 rounded-full border-2 border-red-200"></div>
+                                      <div className="absolute inset-0 rounded-full border-2 border-red-600 border-t-transparent animate-spin"></div>
+                                    </div>
+                                    <span>Generating...</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-sm">🔄</span>
+                                  Replace
+                                </>
+                              )}
                             </button>
 
                             <div className="w-full sm:w-auto">
@@ -400,10 +433,39 @@ const MacroMealGenerator = () => {
                                 macroGoals={macroGoals}
                                 filters={filters}
                                 favoriteFoods={foodPreferences}
+                                excludedFoods={foodExclusions}
                                 onMealSwap={handleMealSwap}
                               />
                             </div>
                           </div>
+
+                          {/* Loading Overlay for Meal Replacement */}
+                          {replacingMealIndex === index && (
+                            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center z-10">
+                              <div className="text-center p-6">
+                                <div className="relative w-16 h-16 mx-auto mb-4">
+                                  {/* Outer ring */}
+                                  <div className="absolute inset-0 rounded-full border-4 border-red-100"></div>
+                                  {/* Animated inner ring */}
+                                  <div className="absolute inset-0 rounded-full border-4 border-red-500 border-t-transparent animate-spin"></div>
+                                  {/* Center icon */}
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-2xl">🤖</span>
+                                  </div>
+                                </div>
+                                
+                                <h4 className="font-semibold text-slate-900 mb-2">Generating New Meal</h4>
+                                <p className="text-sm text-slate-600 mb-4">AI is creating a delicious alternative...</p>
+                                
+                                {/* Progress Bar */}
+                                <div className="w-48 bg-slate-200 rounded-full h-2 mx-auto">
+                                  <div className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
+                                </div>
+                                
+                                <p className="text-xs text-slate-500 mt-3">This usually takes 3-5 seconds</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Macro Grid */}

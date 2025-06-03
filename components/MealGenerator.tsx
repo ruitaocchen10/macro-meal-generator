@@ -8,6 +8,7 @@ interface MealGeneratorProps {
   macroGoals: MacroGoals;
   filters: Filters;
   favoriteFoods?: string[];
+  excludedFoods?: string[];  // ADD THIS LINE
   onMealsGenerated: (meals: Meal[]) => void;
   onPlanInfoGenerated?: (planInfo: { routine: any; totalMacros: any }) => void;
 }
@@ -16,6 +17,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
   macroGoals, 
   filters, 
   favoriteFoods = [],
+  excludedFoods = [],  // ADD THIS LINE
   onMealsGenerated,
   onPlanInfoGenerated
 }) => {
@@ -52,7 +54,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
     try {
       console.log('🤖 Generating AI meals...');
       
-      const meals = await generateAIMeals(macroGoals, filters, favoriteFoods, prompt);
+      const meals = await generateAIMeals(macroGoals, filters, favoriteFoods, excludedFoods, prompt);
       const planInfo = createPlanInfo(macroGoals);
       
       console.log('✅ AI generation successful!', meals);

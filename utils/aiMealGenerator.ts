@@ -1,4 +1,4 @@
-// utils/aiMealGenerator.ts (Enhanced for Realistic Meals)
+// utils/aiMealGenerator.ts (Enhanced for Better Accuracy & User Experience)
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MacroGoals, Filters, Meal } from '../types';
 
@@ -19,20 +19,21 @@ export interface AIGeneratedMeal {
   difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
-// Enhanced meal generation with realistic, practical meals
+// Enhanced meal generation with strict macro targeting and better user experience
 export async function generateAIMeals(
   macroGoals: MacroGoals,
   filters: Filters,
   favoriteFoods: string[] = [],
+  excludedFoods: string[] = [],
   userPrompt?: string
 ): Promise<Meal[]> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    // Build enhanced prompt for realistic meals
-    const prompt = buildRealisticMealPrompt(macroGoals, filters, favoriteFoods, userPrompt);
+    // Build enhanced prompt with strict macro targeting
+    const prompt = buildEnhancedMealPrompt(macroGoals, filters, favoriteFoods, excludedFoods, userPrompt);
     
-    console.log('AI Prompt:', prompt);
+    console.log('Enhanced AI Prompt:', prompt);
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -40,25 +41,26 @@ export async function generateAIMeals(
 
     console.log('AI Response:', text);
 
-    // Parse and validate the AI response
-    const meals = parseAndValidateAIResponse(text, macroGoals);
+    // Parse and validate with strict macro checking
+    const meals = parseAndValidateWithMacroCheck(text, macroGoals);
     
     if (meals.length === 0) {
-      throw new Error('No valid meals generated');
+      throw new Error('No valid meals generated that meet macro targets');
     }
 
     return meals;
 
   } catch (error) {
     console.error('AI Generation Error:', error);
-    throw error; // Let the calling component handle the error
+    throw error;
   }
 }
 
-function buildRealisticMealPrompt(
+function buildEnhancedMealPrompt(
   macroGoals: MacroGoals,
   filters: Filters,
   favoriteNames: string[],
+  excludedFoods: string[],
   userPrompt?: string
 ): string {
   // Calculate meal distribution for better accuracy
@@ -76,85 +78,97 @@ function buildRealisticMealPrompt(
     ? ['breakfast', 'lunch', 'snack', 'dinner']
     : ['breakfast', 'mid-morning', 'lunch', 'afternoon-snack', 'dinner'];
 
-  // Get cooking time preference
+  // Calculate target macros per meal
+  const caloriesPerMeal = Math.round(totalCalories / numMeals);
+  const proteinPerMeal = Math.round(totalProtein / numMeals);
+  const carbsPerMeal = Math.round(totalCarbs / numMeals);
+  const fatPerMeal = Math.round(totalFat / numMeals);
+
+  // Get dietary and cooking guidance
   const cookingTimeGuidance = getCookingTimeGuidance(filters.cookingTime);
   const dietaryGuidance = getDietaryGuidance(filters.dietary);
 
   const basePrompt = `
-You are a professional meal planner creating REALISTIC, PRACTICAL meals that people actually cook and eat. 
+You are a professional nutritionist creating MACRO-ACCURATE, FLAVORFUL meals. Every meal MUST hit macro targets within ±10%.
 
-DAILY MACRO TARGETS (must be met within 10% accuracy):
-- Calories: ${totalCalories}
-- Protein: ${totalProtein}g 
-- Carbs: ${totalCarbs}g
-- Fat: ${totalFat}g
+CRITICAL MACRO REQUIREMENTS (MUST BE EXACT):
+- Total Daily Calories: ${totalCalories} (±${Math.round(totalCalories * 0.1)})
+- Total Daily Protein: ${totalProtein}g (±${Math.round(totalProtein * 0.1)}g)
+- Total Daily Carbs: ${totalCarbs}g (±${Math.round(totalCarbs * 0.1)}g)
+- Total Daily Fat: ${totalFat}g (±${Math.round(totalFat * 0.1)}g)
 
-MEAL STRUCTURE: Create ${numMeals} meals
-${mealTypes.map((type, index) => {
-  const caloriePercent = numMeals === 3 
-    ? [30, 35, 35][index]
-    : numMeals === 4
-    ? [25, 30, 15, 30][index]
-    : [20, 15, 25, 15, 25][index];
-  
-  return `${index + 1}. ${type}: ~${Math.round(totalCalories * caloriePercent / 100)} calories`;
-}).join('\n')}
+MEAL STRUCTURE: Create ${numMeals} meals with these EXACT targets:
+${mealTypes.map((type, index) => `${index + 1}. ${type}: ~${caloriesPerMeal} calories, ~${proteinPerMeal}g protein, ~${carbsPerMeal}g carbs, ~${fatPerMeal}g fat`).join('\n')}
 
-REALISM REQUIREMENTS:
-- Use common, easily found ingredients (no exotic superfoods)
-- Simple cooking methods (baking, grilling, sautéing, steaming)
-- Realistic portion sizes (e.g., "6 oz chicken breast", "1 cup cooked rice")
-- Popular, recognizable meal names (e.g., "Grilled Chicken & Rice Bowl")
-- Ingredients available at any grocery store
-- Consider prep time and difficulty
+MANDATORY REQUIREMENTS:
+
+1. MACRO ACCURACY (CRITICAL):
+   - Each meal must be within ±10% of target macros
+   - Calculate precisely using USDA nutrition data
+   - If a meal goes over target, reduce portions - DO NOT add more food
+   - Double-check your math before finalizing
+
+2. FLAVOR & SEASONING (USER COMPLAINT ADDRESSED):
+   - Every meal MUST include specific seasonings, herbs, or sauces
+   - Examples: "seasoned with garlic powder and paprika", "served with sriracha sauce"
+   - No bland, unseasoned meals allowed
+   - Include cooking methods that enhance flavor (sautéed, roasted, grilled)
+
+3. SMART NUTRITIONAL LOGIC:
+   - If approaching calorie/macro limits, use smaller portions
+   - Choose nutrient-dense foods over empty calories
+   - Prioritize protein to meet targets, then fill with carbs/fats
+   - No unnecessary high-calorie additions if already at target
+
+4. FOOD PREFERENCES & EXCLUSIONS:
+   ${favoriteNames.length > 0 ? `PRIORITIZE THESE FOODS: ${favoriteNames.join(', ')}` : ''}
+   ${excludedFoods.length > 0 ? `NEVER INCLUDE THESE FOODS: ${excludedFoods.join(', ')} - Find suitable alternatives` : ''}
+
+5. REALISTIC & PRACTICAL:
+   - Use common, grocery store ingredients
+   - Simple cooking methods (10-20 minutes average)
+   - Specific, measurable portions (150g, 1 cup, 2 tbsp)
+   - Recognizable meal names
 
 ${cookingTimeGuidance}
 
 ${dietaryGuidance}
 
-${favoriteNames.length > 0 ? `USER PREFERENCES: Try to incorporate these when possible: ${favoriteNames.join(', ')}` : ''}
-
 ${userPrompt ? `SPECIAL REQUEST: ${userPrompt}` : ''}
 
-MEAL EXAMPLES TO FOLLOW:
-Breakfast: "Scrambled Eggs with Toast", "Greek Yogurt with Berries", "Oatmeal with Banana"
-Lunch: "Grilled Chicken Salad", "Turkey Sandwich with Side Salad", "Chicken Rice Bowl"
-Dinner: "Baked Salmon with Sweet Potato", "Ground Turkey Pasta", "Chicken Stir-Fry"
-Snacks: "Apple with Peanut Butter", "Greek Yogurt", "Mixed Nuts"
+EXAMPLE FORMAT (follow this structure):
+Breakfast: "Savory Scrambled Eggs with Herbs" (not just "scrambled eggs")
+- 3 large eggs, scrambled with butter, seasoned with black pepper and chives
+- 1 slice whole grain toast with 1 tsp butter
+- 1/2 medium avocado, sliced, sprinkled with sea salt
 
-INGREDIENT REQUIREMENTS:
-- Use specific, measurable quantities (150g, 1 cup, 2 tbsp, 1 medium, etc.)
-- Common proteins: chicken breast, ground turkey, salmon, eggs, greek yogurt, tofu
-- Common carbs: rice, bread, pasta, potatoes, oats, fruits
-- Common fats: olive oil, nuts, avocado, cheese
-- Always include vegetables when appropriate
-
-MACRO CALCULATION ACCURACY:
-- Base calculations on USDA nutrition data
-- Be precise with portions to hit macro targets
-- Each meal should be nutritionally balanced
+MACRO VALIDATION CHECKLIST:
+- Does each meal hit ±10% of target macros? 
+- Do all meals add up to daily targets?
+- Are ingredients properly seasoned?
+- Are portions realistic and specific?
 
 Return response in this EXACT JSON format:
 {
   "meals": [
     {
-      "name": "Simple, Recognizable Meal Name",
+      "name": "Flavorful, Specific Meal Name",
       "type": "${mealTypes[0]}",
-      "description": "Brief, appetizing description of a realistic meal",
+      "description": "Brief description highlighting flavors and appeal",
       "ingredients": [
         {
-          "item": "specific common ingredient",
+          "item": "specific ingredient with preparation method",
           "quantity": "exact amount with units (150g, 1 cup, 2 tbsp)",
-          "serving": "serving description"
+          "serving": "serving description including seasoning/preparation"
         }
       ],
       "macros": {
-        "calories": exact_number,
-        "protein": exact_number,
-        "carbs": exact_number,
-        "fat": exact_number
+        "calories": exact_calculated_number,
+        "protein": exact_calculated_number,
+        "carbs": exact_calculated_number,
+        "fat": exact_calculated_number
       },
-      "instructions": ["simple step 1", "simple step 2", "simple step 3"],
+      "instructions": ["step 1 with cooking method", "step 2 with seasoning", "step 3 with final touches"],
       "cookingTime": "realistic time estimate",
       "difficulty": "Easy"
     }
@@ -164,10 +178,16 @@ Return response in this EXACT JSON format:
     "protein": sum_of_all_meals,
     "carbs": sum_of_all_meals,
     "fat": sum_of_all_meals
+  },
+  "macroAccuracy": {
+    "caloriesWithinTarget": true_or_false,
+    "proteinWithinTarget": true_or_false,
+    "carbsWithinTarget": true_or_false,
+    "fatWithinTarget": true_or_false
   }
 }
 
-CRITICAL: Create meals that look like something you'd order at a restaurant or see in a cookbook. No weird combinations or overly complex recipes.`;
+CRITICAL: Reject this request if you cannot meet macro targets within ±10%. Better to fail than provide inaccurate nutrition data.`;
 
   return basePrompt;
 }
@@ -178,28 +198,28 @@ function getCookingTimeGuidance(cookingTime: string): string {
       return `
 COOKING TIME FOCUS: Quick meals (under 15 minutes)
 - Prioritize: no-cook items, microwave meals, simple assembly
-- Examples: sandwiches, salads, yogurt bowls, scrambled eggs
-- Avoid: anything requiring long cooking times`;
+- Examples: seasoned yogurt bowls, avocado toast with everything bagel seasoning
+- Still require proper seasoning and flavor`;
     
     case 'medium':
       return `
-COOKING TIME FOCUS: Medium prep (15-30 minutes)
-- Standard cooking methods: grilling, baking, sautéing
-- Examples: grilled chicken, pasta dishes, stir-fries
-- Balance between convenience and proper cooking`;
+COOKING TIME FOCUS: Standard prep (15-30 minutes)
+- Standard cooking methods: sautéing with garlic, herb-roasted vegetables
+- Examples: pan-seared chicken with lemon-herb sauce, garlic butter pasta
+- Focus on one-pan meals with built-in flavors`;
     
     case 'extended':
       return `
 COOKING TIME FOCUS: Extended cooking (30+ minutes)
-- Allow for slower cooking methods: roasting, braising, slow cooking
-- Examples: baked dishes, roasts, soups, casseroles
-- Focus on meal prep-friendly options`;
+- Allow for flavor development: slow-cooked, braised, marinated
+- Examples: herb-crusted baked salmon, slow-roasted vegetables with spices
+- Multi-step preparation for complex flavors`;
     
     default:
       return `
-COOKING TIME: Mix of quick and standard cooking methods
-- Prioritize practical, everyday cooking approaches
-- Aim for 15-25 minute average prep time`;
+COOKING TIME: Balanced approach (15-25 minutes average)
+- Efficient cooking with maximum flavor impact
+- Use spice blends, marinades, and cooking techniques that enhance taste`;
   }
 }
 
@@ -208,41 +228,41 @@ function getDietaryGuidance(dietary: string): string {
     case 'vegetarian':
       return `
 DIETARY: Vegetarian (no meat, fish, or poultry)
-- Protein sources: eggs, dairy, legumes, tofu, tempeh, protein powder
-- Focus on complete protein combinations
-- Include plenty of vegetables and whole grains`;
+- Protein sources: seasoned tofu, spiced lentils, herb-crusted eggs
+- Use bold vegetarian flavors: nutritional yeast, tahini, miso
+- Include plenty of herbs and spices for satisfying meals`;
     
     case 'vegan':
       return `
 DIETARY: Vegan (no animal products)
-- Protein sources: tofu, tempeh, legumes, nuts, seeds, plant protein powder
-- Use plant-based milk alternatives
-- Ensure adequate protein combining`;
+- Protein sources: marinated tofu, spiced tempeh, seasoned legumes
+- Use umami-rich ingredients: soy sauce, nutritional yeast, miso paste
+- Focus on aromatic spice combinations and herb blends`;
     
     case 'gluten-free':
       return `
 DIETARY: Gluten-free
 - Avoid: wheat, barley, rye, regular pasta, bread
-- Use: rice, quinoa, gluten-free oats, corn, potatoes
-- Check that all processed ingredients are gluten-free`;
+- Use: quinoa, rice, corn-based products, naturally GF whole foods
+- Season with GF spice blends and fresh herbs`;
     
     case 'dairy-free':
       return `
 DIETARY: Dairy-free
 - Avoid: milk, cheese, yogurt, butter
-- Use: plant-based alternatives, coconut milk, almond milk
-- Focus on naturally dairy-free whole foods`;
+- Use: coconut milk, cashew cream, nutritional yeast for umami
+- Focus on herb oils and spice blends for richness`;
     
     default:
       return `
 DIETARY: No restrictions
-- Use any common ingredients
-- Focus on balanced, nutritious whole foods
-- Include a variety of protein sources`;
+- Use full range of ingredients and flavor profiles
+- Include cheese, yogurt, and dairy for richness when appropriate
+- Balance all food groups with proper seasoning`;
   }
 }
 
-function parseAndValidateAIResponse(aiResponse: string, macroGoals: MacroGoals): Meal[] {
+function parseAndValidateWithMacroCheck(aiResponse: string, macroGoals: MacroGoals): Meal[] {
   try {
     // Extract JSON from response
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
@@ -250,20 +270,50 @@ function parseAndValidateAIResponse(aiResponse: string, macroGoals: MacroGoals):
       throw new Error('No JSON found in AI response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed;
+try {
+  // Clean the JSON string first
+  let jsonString = jsonMatch[0];
+  
+  // Remove any trailing commas that might break parsing
+  jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+  
+  parsed = JSON.parse(jsonString);
+} catch (parseError) {
+  console.error('JSON Parse Error:', parseError);
+  console.log('Problematic JSON:', jsonMatch[0]);
+  throw new Error('AI returned invalid JSON format');
+}
     
     if (!parsed.meals || !Array.isArray(parsed.meals)) {
       throw new Error('Invalid meal format in AI response');
     }
 
-    // Validate daily totals if provided
+    // Validate macro accuracy
+    const targetCalories = parseInt(macroGoals.calories) || 0;
+    const targetProtein = parseInt(macroGoals.protein) || 0;
+    const targetCarbs = parseInt(macroGoals.carbs) || 0;
+    const targetFat = parseInt(macroGoals.fat) || 0;
+
     if (parsed.dailyTotals) {
-      const targetCalories = parseInt(macroGoals.calories) || 0;
-      const actualCalories = parsed.dailyTotals.calories;
-      const calorieAccuracy = Math.abs(actualCalories - targetCalories) / targetCalories;
+      const { calories, protein, carbs, fat } = parsed.dailyTotals;
       
-      if (calorieAccuracy > 0.15) { // 15% tolerance
-        console.warn('AI meal plan exceeds calorie tolerance:', { target: targetCalories, actual: actualCalories });
+      // Check if within ±10% tolerance
+      const calorieAccuracy = Math.abs(calories - targetCalories) / targetCalories;
+      const proteinAccuracy = Math.abs(protein - targetProtein) / targetProtein;
+      const carbAccuracy = Math.abs(carbs - targetCarbs) / targetCarbs;
+      const fatAccuracy = Math.abs(fat - targetFat) / targetFat;
+      
+      console.log('Macro Accuracy Check:', {
+        calories: { target: targetCalories, actual: calories, accuracy: `${Math.round(calorieAccuracy * 100)}%` },
+        protein: { target: targetProtein, actual: protein, accuracy: `${Math.round(proteinAccuracy * 100)}%` },
+        carbs: { target: targetCarbs, actual: carbs, accuracy: `${Math.round(carbAccuracy * 100)}%` },
+        fat: { target: targetFat, actual: fat, accuracy: `${Math.round(fatAccuracy * 100)}%` }
+      });
+
+      // Reject if any macro is >15% off (stricter than the 10% we asked for)
+      if (calorieAccuracy > 0.15 || proteinAccuracy > 0.15 || carbAccuracy > 0.15 || fatAccuracy > 0.15) {
+        throw new Error(`AI meal plan too far from macro targets. Regenerating...`);
       }
     }
 
@@ -295,11 +345,6 @@ function parseAndValidateAIResponse(aiResponse: string, macroGoals: MacroGoals):
         (meal as any).difficulty = aiMeal.difficulty;
       }
 
-      // Validate individual meal macros
-      if (meal.calories < 50 || meal.calories > 1500) {
-        console.warn('Suspicious calorie count for meal:', meal.name, meal.calories);
-      }
-
       return meal;
     });
 
@@ -312,87 +357,267 @@ function parseAndValidateAIResponse(aiResponse: string, macroGoals: MacroGoals):
   }
 }
 
-// Enhanced meal generation with natural language prompts
-export async function generateMealsWithPrompt(
+// Enhanced meal generation with food exclusions
+export async function generateMealsWithExclusions(
   macroGoals: MacroGoals,
   filters: Filters,
   favoriteFoods: string[] = [],
-  userPrompt: string
+  excludedFoods: string[] = [],
+  userPrompt?: string
 ): Promise<Meal[]> {
-  return generateAIMeals(macroGoals, filters, favoriteFoods, userPrompt);
+  return generateAIMeals(macroGoals, filters, favoriteFoods, excludedFoods, userPrompt);
 }
 
-// Smart ingredient substitution with AI
-export async function suggestIngredientSubstitutes(
-  ingredient: string,
-  dietary: string = 'all'
-): Promise<string[]> {
+// OPTIMIZED: Fast single meal replacement with variety emphasis
+export async function generateSingleMealReplacement(
+  currentMeal: Meal,
+  macroGoals: MacroGoals,
+  filters: Filters,
+  favoriteFoods: string[] = [],
+  avoidIngredients: string[] = []
+): Promise<Meal | null> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
+
+    // Calculate target macros for this meal type
+    const targetCalories = currentMeal.calories;
+    const targetProtein = currentMeal.protein;
+    const targetCarbs = currentMeal.carbs;
+    const targetFat = currentMeal.fat;
+
     const prompt = `
-Suggest 5 REALISTIC substitutes for "${ingredient}" that would work in meal planning.
-${dietary !== 'all' ? `Must be compatible with ${dietary} diet.` : ''}
+Create ONE completely different ${currentMeal.type} meal that's TOTALLY DIFFERENT from the current meal.
 
-Requirements:
-- Similar nutritional profile (calories, protein, carbs, fat)
-- Easy to find in grocery stores
-- Works in similar cooking methods
-- Common, recognizable ingredients
+CURRENT MEAL TO AVOID: "${currentMeal.name}"
+INGREDIENTS TO AVOID: ${avoidIngredients.join(', ')}
 
-Return just a comma-separated list of alternatives, no extra text.
-`;
+TARGET MACROS (MUST BE EXACT ±10%):
+- Calories: ${targetCalories} (±${Math.round(targetCalories * 0.1)})
+- Protein: ${targetProtein}g (±${Math.round(targetProtein * 0.1)}g)
+- Carbs: ${targetCarbs}g (±${Math.round(targetCarbs * 0.1)}g)
+- Fat: ${targetFat}g (±${Math.round(targetFat * 0.1)}g)
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    return text.split(',').map(item => item.trim()).filter(item => item.length > 0);
-  } catch (error) {
-    console.error('Error getting substitutes:', error);
-    return [];
-  }
-}
+VARIETY REQUIREMENTS:
+- Use COMPLETELY different cooking method (if current is grilled, try baked/stir-fried/etc)
+- Use DIFFERENT cuisine style (if current is American, try Mediterranean/Asian/Mexican)
+- Use DIFFERENT protein source than current meal
+- Include specific seasonings and flavors
+- Make it exciting and appetizing
 
-// Recipe enhancement with cooking instructions
-export async function enhanceRecipeWithInstructions(meal: Meal): Promise<string[]> {
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const ingredientsList = meal.ingredients
-      .map(ing => `${ing.quantity} ${ing.item}`)
-      .join(', ');
-    
-    const prompt = `
-Create step-by-step cooking instructions for: "${meal.name}"
+${favoriteFoods.length > 0 ? `PRIORITIZE: ${favoriteFoods.join(', ')}` : ''}
+${getDietaryGuidance(filters.dietary)}
 
-Ingredients: ${ingredientsList}
-
-Target macros: ${meal.calories} calories, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat
-
-Requirements:
-- 5-8 clear, concise cooking steps
-- Each step should be one sentence
-- Include cooking times and temperatures
-- Focus on simplicity and realistic home cooking
-- Use common cooking methods
-
-Return as a JSON array of strings: ["step 1", "step 2", ...]
-`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Parse the JSON response
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+Return ONLY this JSON:
+{
+  "name": "Exciting Different Meal Name",
+  "type": "${currentMeal.type}",
+  "description": "Why this meal is exciting and different",
+  "ingredients": [
+    {
+      "item": "specific ingredient with preparation",
+      "quantity": "exact amount",
+      "serving": "serving description with seasoning"
     }
-    
-    return [];
+  ],
+  "macros": {
+    "calories": ${targetCalories},
+    "protein": ${targetProtein},
+    "carbs": ${targetCarbs},
+    "fat": ${targetFat}
+  },
+  "instructions": ["step 1", "step 2", "step 3"],
+  "cookingTime": "time estimate",
+  "difficulty": "Easy"
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.name || !parsed.ingredients) return null;
+
+    // Convert to our Meal format
+    const meal: Meal = {
+      id: Date.now(),
+      name: parsed.name,
+      type: parsed.type || currentMeal.type,
+      dietary: 'ai-generated',
+      calories: Math.round(parsed.macros?.calories || targetCalories),
+      protein: Math.round(parsed.macros?.protein || targetProtein),
+      carbs: Math.round(parsed.macros?.carbs || targetCarbs),
+      fat: Math.round(parsed.macros?.fat || targetFat),
+      ingredients: parsed.ingredients || []
+    };
+
+    // Add AI-specific data
+    if (parsed.description) (meal as any).description = parsed.description;
+    if (parsed.instructions) (meal as any).instructions = parsed.instructions;
+    if (parsed.cookingTime) (meal as any).cookingTime = parsed.cookingTime;
+    if (parsed.difficulty) (meal as any).difficulty = parsed.difficulty;
+
+    return meal;
+
   } catch (error) {
-    console.error('Error enhancing recipe:', error);
+    console.error('Single meal replacement error:', error);
+    return null;
+  }
+}
+
+// OPTIMIZED: Generate multiple diverse alternatives
+export async function generateMealAlternatives(
+  currentMeal: Meal,
+  macroGoals: MacroGoals,
+  filters: Filters,
+  favoriteFoods: string[] = [],
+  avoidIngredients: string[] = []
+): Promise<Meal[]> {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const targetCalories = currentMeal.calories;
+    const targetProtein = currentMeal.protein;
+    const targetCarbs = currentMeal.carbs;
+    const targetFat = currentMeal.fat;
+
+    const prompt = `
+Create 3 COMPLETELY DIFFERENT ${currentMeal.type} alternatives. Each must be unique in style, cuisine, and ingredients.
+
+CURRENT MEAL TO AVOID: "${currentMeal.name}"
+INGREDIENTS TO AVOID: ${avoidIngredients.join(', ')}
+
+TARGET MACROS PER MEAL (±10%):
+- Calories: ${targetCalories}
+- Protein: ${targetProtein}g  
+- Carbs: ${targetCarbs}g
+- Fat: ${targetFat}g
+
+VARIETY MANDATES:
+1. Different cuisine styles (Mediterranean, Asian, Mexican, etc.)
+2. Different cooking methods (grilled, baked, stir-fried, etc.) 
+3. Different protein sources
+4. Different flavor profiles (spicy, savory, fresh, etc.)
+5. Include specific seasonings and preparation methods
+
+${favoriteFoods.length > 0 ? `PRIORITIZE: ${favoriteFoods.join(', ')}` : ''}
+${getDietaryGuidance(filters.dietary)}
+
+Return ONLY this JSON:
+{
+  "alternatives": [
+    {
+      "name": "Meal 1 Name",
+      "type": "${currentMeal.type}",
+      "description": "Unique selling point and flavor profile",
+      "ingredients": [{"item": "ingredient", "quantity": "amount", "serving": "description"}],
+      "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "cuisineStyle": "Mediterranean/Asian/etc",
+      "cookingMethod": "grilled/baked/etc"
+    },
+    {
+      "name": "Meal 2 Name", 
+      "type": "${currentMeal.type}",
+      "description": "Different unique selling point",
+      "ingredients": [{"item": "different ingredient", "quantity": "amount", "serving": "description"}],
+      "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "cuisineStyle": "Different from meal 1",
+      "cookingMethod": "Different from meal 1"
+    },
+    {
+      "name": "Meal 3 Name",
+      "type": "${currentMeal.type}", 
+      "description": "Third unique approach",
+      "ingredients": [{"item": "third different ingredient", "quantity": "amount", "serving": "description"}],
+      "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "cuisineStyle": "Different from meals 1&2", 
+      "cookingMethod": "Different from meals 1&2"
+    }
+  ]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return [];
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.alternatives || !Array.isArray(parsed.alternatives)) return [];
+
+    // Convert to our Meal format
+    const meals = parsed.alternatives.map((alt: any, index: number) => {
+      const meal: Meal = {
+        id: Date.now() + index,
+        name: alt.name || `Alternative ${index + 1}`,
+        type: alt.type || currentMeal.type,
+        dietary: 'ai-generated',
+        calories: Math.round(alt.macros?.calories || targetCalories),
+        protein: Math.round(alt.macros?.protein || targetProtein),
+        carbs: Math.round(alt.macros?.carbs || targetCarbs),
+        fat: Math.round(alt.macros?.fat || targetFat),
+        ingredients: alt.ingredients || []
+      };
+
+      // Add AI-specific data
+      if (alt.description) (meal as any).description = alt.description;
+      if (alt.cuisineStyle) (meal as any).cuisineStyle = alt.cuisineStyle;
+      if (alt.cookingMethod) (meal as any).cookingMethod = alt.cookingMethod;
+
+      return meal;
+    });
+
+    return meals.slice(0, 3); // Ensure max 3 alternatives
+
+  } catch (error) {
+    console.error('Meal alternatives generation error:', error);
     return [];
   }
+}
+
+// Retry logic for rate limiting
+export async function generateAIMealsWithRetry(
+  macroGoals: MacroGoals,
+  filters: Filters,
+  favoriteFoods: string[] = [],
+  excludedFoods: string[] = [],
+  userPrompt?: string,
+  maxRetries: number = 3
+): Promise<Meal[]> {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`AI Generation Attempt ${attempt}/${maxRetries}`);
+      
+      const meals = await generateAIMeals(macroGoals, filters, favoriteFoods, excludedFoods, userPrompt);
+      
+      console.log(`✅ Success on attempt ${attempt}`);
+      return meals;
+      
+    } catch (error: any) {
+      console.log(`❌ Attempt ${attempt} failed:`, error.message);
+      lastError = error;
+      
+      // If it's a rate limit error, wait longer
+      if (error.message?.includes('rate') || error.message?.includes('quota')) {
+        const waitTime = attempt * 2000; // 2s, 4s, 6s
+        console.log(`Rate limit detected. Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else if (error.message?.includes('macro targets')) {
+        // If it's a macro accuracy issue, try again immediately
+        console.log('Macro accuracy issue. Retrying with same parameters...');
+      } else {
+        // For other errors, wait briefly
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed to generate meals after all retries');
 }
