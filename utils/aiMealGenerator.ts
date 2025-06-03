@@ -97,6 +97,14 @@ CRITICAL MACRO REQUIREMENTS (MUST BE EXACT):
 - Total Daily Carbs: ${totalCarbs}g (±${Math.round(totalCarbs * 0.1)}g)
 - Total Daily Fat: ${totalFat}g (±${Math.round(totalFat * 0.1)}g)
 
+MANDATORY MEASUREMENT RULES (CRITICAL):
+- NEVER use grams or kilograms for ANY ingredient
+- Seasonings: "1 tsp salt", "2 tbsp olive oil", "1 tsp garlic powder"
+- Proteins: "4 oz chicken breast", "2 large eggs", "6 oz salmon fillet"  
+- Carbs: "1 cup cooked rice", "2 slices bread", "1 medium sweet potato"
+- Vegetables: "2 cups spinach", "1 medium bell pepper", "1 cup broccoli"
+- Use only common US cooking measurements that don't require a scale
+
 MEAL STRUCTURE: Create ${numMeals} meals with these EXACT targets:
 ${mealTypes.map((type, index) => `${index + 1}. ${type}: ~${caloriesPerMeal} calories, ~${proteinPerMeal}g protein, ~${carbsPerMeal}g carbs, ~${fatPerMeal}g fat`).join('\n')}
 
