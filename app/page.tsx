@@ -200,7 +200,7 @@ const MacroMealGenerator = () => {
               <Utensils className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-transparent">
-              AI Meal Planner
+            Free Macro Calculator & AI Meal Generator
             </h1>
           </div>
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-medium mb-6 sm:mb-8 px-4">
