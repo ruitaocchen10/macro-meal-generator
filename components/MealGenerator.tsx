@@ -1,14 +1,14 @@
-// components/MealGenerator.tsx (AI-Only Version)
+// components/MealGenerator.tsx - Updated for Flexible Meal/Snack System
 import React, { useState } from 'react';
 import { Brain, Loader, Calendar, Target, MessageSquare } from 'lucide-react';
-import { MacroGoals, Filters, Meal } from '../types';
+import { MacroGoals, Filters, Meal, generateMealStructure } from '../types';
 import { generateAIMeals } from '../utils/aiMealGenerator';
 
 interface MealGeneratorProps {
   macroGoals: MacroGoals;
   filters: Filters;
   favoriteFoods?: string[];
-  excludedFoods?: string[];  // ADD THIS LINE
+  excludedFoods?: string[];
   onMealsGenerated: (meals: Meal[]) => void;
   onPlanInfoGenerated?: (planInfo: { routine: any; totalMacros: any }) => void;
 }
@@ -17,7 +17,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
   macroGoals, 
   filters, 
   favoriteFoods = [],
-  excludedFoods = [],  // ADD THIS LINE
+  excludedFoods = [],
   onMealsGenerated,
   onPlanInfoGenerated
 }) => {
@@ -28,15 +28,19 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
   // Check if AI is available
   const hasAI = !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
 
-  // Simple helper to create plan info
-  const createPlanInfo = (macroGoals: MacroGoals) => {
-    const totalCals = parseInt(macroGoals.calories) || 2000;
-    const mealCount = totalCals < 1800 ? 3 : totalCals < 2500 ? 4 : 5;
-    
+  // Enhanced plan info creation with meal configuration
+  const createPlanInfo = (macroGoals: MacroGoals, mealConfig: any) => {
+    const totalItems = mealConfig.mealCount + mealConfig.snackCount;
+    let description = `${mealConfig.mealCount} meal${mealConfig.mealCount !== 1 ? 's' : ''}`;
+    if (mealConfig.snackCount > 0) {
+      description += ` + ${mealConfig.snackCount} snack${mealConfig.snackCount !== 1 ? 's' : ''}`;
+    }
+    description += ' with AI-optimized macro distribution';
+
     return {
       routine: {
-        name: `${mealCount}-Meal AI Plan`,
-        description: "AI-optimized meal distribution for your goals"
+        name: `${totalItems}-Item AI Structure`,
+        description
       },
       totalMacros: {
         calories: parseInt(macroGoals.calories) || 0,
@@ -52,10 +56,10 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      console.log('🤖 Generating AI meals...');
+      console.log('🤖 Generating AI meals with configuration:', filters.mealConfiguration);
       
       const meals = await generateAIMeals(macroGoals, filters, favoriteFoods, excludedFoods, prompt);
-      const planInfo = createPlanInfo(macroGoals);
+      const planInfo = createPlanInfo(macroGoals, filters.mealConfiguration);
       
       console.log('✅ AI generation successful!', meals);
       
@@ -72,7 +76,6 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
 
     } catch (error) {
       console.error('❌ AI generation failed:', error);
-      // Since we're AI-only now, show error message instead of fallback
       alert('AI meal generation failed. Please check your API key and try again.');
     } finally {
       setIsGenerating(false);
@@ -95,16 +98,34 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
 
   const hasValidGoals = macroGoals.calories || macroGoals.protein || macroGoals.carbs || macroGoals.fat;
 
+  // Get meal structure summary
+  const getMealStructureSummary = () => {
+    const meals = filters.mealConfiguration.mealCount;
+    const snacks = filters.mealConfiguration.snackCount;
+    
+    let text = `${meals} meal${meals !== 1 ? 's' : ''}`;
+    if (snacks > 0) {
+      text += ` + ${snacks} snack${snacks !== 1 ? 's' : ''}`;
+    }
+    return text;
+  };
+
   const promptSuggestions = [
-    "Mediterranean-inspired meals",
-    "Quick 15-minute recipes", 
-    "High-protein muscle building",
-    "Comfort food that fits macros",
-    "Asian fusion cuisine",
-    "Meal prep friendly options",
-    "Low-carb keto style",
-    "Plant-based protein focus"
+    "Mediterranean-inspired meals with simple snacks",
+    "Quick breakfast & easy grab-and-go snacks", 
+    "High-protein meals with protein-rich snacks",
+    "Comfort food meals with healthy snacks",
+    "Asian fusion meals with fruit-based snacks",
+    "Meal prep friendly options with portable snacks",
+    "Low-carb meals with keto-friendly snacks",
+    "Plant-based meals with vegan snack options"
   ];
+
+  // Generate preview structure for display
+  const previewStructure = generateMealStructure(
+    filters.mealConfiguration.mealCount, 
+    filters.mealConfiguration.snackCount
+  );
 
   if (!hasAI) {
     return (
@@ -117,7 +138,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
             </div>
             <h2 className="text-3xl font-bold text-slate-900 mb-4">AI Setup Required</h2>
             <p className="text-slate-600 mb-6 max-w-md mx-auto">
-              This app requires a Google AI API key to generate personalized meals. Please add your API key to get started.
+              This app requires a Google AI API key to generate personalized meal structures. Please add your API key to get started.
             </p>
             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
               <p className="text-amber-800 text-sm">
@@ -140,27 +161,49 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
               <Brain className="h-10 w-10 text-white" />
             </div>
             <div className="text-left">
-              <h2 className="text-3xl font-bold text-slate-900">AI Meal Generator</h2>
-              <p className="text-slate-600">Intelligent meal creation with infinite variety</p>
+              <h2 className="text-3xl font-bold text-slate-900">AI Meal Structure Generator</h2>
+              <p className="text-slate-600">Intelligent {getMealStructureSummary()} with perfect macro distribution</p>
+            </div>
+          </div>
+
+          {/* Current Structure Preview */}
+          <div className="mb-8 p-6 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200">
+            <h3 className="font-semibold text-emerald-900 mb-4 flex items-center justify-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Your Selected Structure ({previewStructure.totalItems} items)
+            </h3>
+            <div className="flex flex-wrap justify-center gap-2">
+              {previewStructure.mealTypes.map((item, index) => (
+                <span 
+                  key={index}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                    item.category === 'meal' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-orange-100 text-orange-800'
+                  }`}
+                >
+                  {item.category === 'meal' ? '🍽️' : '🥨'} {item.name} ({item.caloriePercentage}%)
+                </span>
+              ))}
             </div>
           </div>
 
           {/* AI Features Preview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              <Calendar className="h-6 w-6 text-blue-500 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 mb-1">Smart Planning</h3>
-              <p className="text-sm text-gray-600">AI calculates optimal meal distribution</p>
+              <Calendar className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 mb-1">Flexible Structure</h3>
+              <p className="text-sm text-gray-600">Choose any combination of meals & snacks</p>
             </div>
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              <Target className="h-6 w-6 text-green-500 mx-auto mb-2" />
+              <Target className="h-6 w-6 text-blue-500 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 mb-1">Macro Precision</h3>
-              <p className="text-sm text-gray-600">AI targets within 5% accuracy</p>
+              <p className="text-sm text-gray-600">Each item hits its exact calorie percentage target</p>
             </div>
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <Brain className="h-6 w-6 text-purple-500 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 mb-1">Infinite Variety</h3>
-              <p className="text-sm text-gray-600">Unlimited meal combinations and cuisines</p>
+              <h3 className="font-semibold text-gray-900 mb-1">Context Aware</h3>
+              <p className="text-sm text-gray-600">Meals get complex recipes, snacks stay simple</p>
             </div>
           </div>
 
@@ -179,15 +222,31 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
             {isGenerating ? (
               <>
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-white"></div>
-                AI Creating Your Plan...
+                AI Creating Your {getMealStructureSummary()}...
               </>
             ) : (
               <>
                 <Brain className="h-7 w-7 group-hover:scale-110 transition-transform duration-300" />
-                Generate AI Meal Plan
+                Generate AI Meal Structure
               </>
             )}
           </button>
+
+          {/* Generation Preview */}
+          {isGenerating && (
+            <div className="mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                <span className="text-indigo-700 font-medium">AI is working on your structure...</span>
+              </div>
+              <div className="text-sm text-indigo-600 space-y-1">
+                <p>🧠 Analyzing your macro targets and food preferences</p>
+                <p>🍽️ Creating {filters.mealConfiguration.mealCount} complete meals with complex recipes</p>
+                <p>🥨 Designing {filters.mealConfiguration.snackCount} simple snacks with quick prep</p>
+                <p>📊 Ensuring each item hits its exact macro percentage target</p>
+              </div>
+            </div>
+          )}
 
           {/* Custom AI Prompt */}
           <div className="mt-8 border-t border-slate-200 pt-6">
@@ -201,12 +260,12 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
 
             {showCustomPrompt && (
               <div className="mt-6 p-6 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top duration-300">
-                <h4 className="font-semibold text-slate-900 mb-3">Tell AI what you want:</h4>
+                <h4 className="font-semibold text-slate-900 mb-3">Customize your {getMealStructureSummary()}:</h4>
                 
                 <textarea
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="e.g., 'Create Mediterranean meals with lots of vegetables' or 'Quick breakfast options under 300 calories'"
+                  placeholder={`e.g., 'Create Mediterranean meals with simple Greek yogurt snacks' or 'High-protein breakfast with low-carb snacks'`}
                   className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-slate-900"
                   rows={3}
                 />
@@ -229,7 +288,7 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
                   disabled={!customPrompt.trim() || isGenerating}
                   className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Generate Custom AI Plan
+                  Generate Custom AI Structure
                 </button>
               </div>
             )}
@@ -238,10 +297,25 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
           {!hasValidGoals && (
             <div className="mt-6 p-6 bg-amber-50 rounded-2xl border border-amber-200">
               <p className="text-amber-800 font-medium">
-                <strong>Enter your macro goals above</strong> to create your personalized AI meal plan
+                <strong>Enter your macro goals above</strong> to create your personalized AI meal structure
               </p>
             </div>
           )}
+
+          {/* Structure Benefits */}
+          <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200">
+            <h4 className="font-semibold text-blue-900 mb-4">🎯 Why This Structure Works</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700">
+              <div className="space-y-2">
+                <p>✅ <strong>Meals (~75% total):</strong> Complete nutrition with 3-5 ingredients</p>
+                <p>✅ <strong>Snacks (~25% total):</strong> Simple prep with 1-3 ingredients</p>
+              </div>
+              <div className="space-y-2">
+                <p>✅ <strong>Smart Distribution:</strong> Protein evenly spread for muscle synthesis</p>
+                <p>✅ <strong>Flexible Choice:</strong> Pick exactly what fits your lifestyle</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

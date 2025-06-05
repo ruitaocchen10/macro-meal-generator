@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MacroGoals, Filters, Meal } from '../types';
+import { MacroGoals, Filters, Meal, generateMealStructure } from '../types';
 import { generateAIMeals } from '../utils/aiMealGenerator';
 import MacroCalculator from '../components/MacroCalculator';
-import FiltersSection from '../components/FiltersSection';
+import MealSnackSelector from '../components/MealSnackSelector';
 import TextPreferences from '../components/TextPreferences';
 import MealGenerator from '../components/MealGenerator';
 import MealSwapper from '../components/MealSwapper';
-import { Target, Utensils, Sparkles, BarChart3, CheckCircle } from 'lucide-react';
+import { Target, Utensils, Sparkles, BarChart3, CheckCircle, Calendar } from 'lucide-react';
 
 const MacroMealGenerator = () => {
   const [macroGoals, setMacroGoals] = useState<MacroGoals>({
@@ -19,7 +19,10 @@ const MacroMealGenerator = () => {
   });
   
   const [filters, setFilters] = useState<Filters>({
-    cookingTime: 'any',
+    mealConfiguration: {
+      mealCount: 3,
+      snackCount: 2
+    },
     dietary: 'all'
   });
   
@@ -35,18 +38,19 @@ const MacroMealGenerator = () => {
   const [replacingMealIndex, setReplacingMealIndex] = useState<number | null>(null);
 
   // Helper functions
-  const getMealCount = (calories: string) => {
-    const totalCals = parseInt(calories) || 2000;
-    return totalCals < 1800 ? 3 : totalCals < 2500 ? 4 : 5;
-  };
+  const createPlanInfo = (macroGoals: MacroGoals, mealConfig: any) => {
+    const totalItems = mealConfig.mealCount + mealConfig.snackCount;
+    let description = `${mealConfig.mealCount} meal${mealConfig.mealCount !== 1 ? 's' : ''}`;
+    if (mealConfig.snackCount > 0) {
+      description += ` + ${mealConfig.snackCount} snack${mealConfig.snackCount !== 1 ? 's' : ''}`;
+    }
+    description += ' with optimized macro distribution';
 
-  const createPlanInfo = (macroGoals: MacroGoals) => {
-    const mealCount = getMealCount(macroGoals.calories);
     return {
-      totalMeals: mealCount,
+      totalMeals: totalItems,
       routine: {
-        name: `${mealCount}-Meal Plan`,
-        description: "Personalized meal distribution for your goals"
+        name: `${totalItems}-Item Daily Structure`,
+        description
       }
     };
   };
@@ -95,17 +99,16 @@ const MacroMealGenerator = () => {
   };
 
   const handleMealSwap = async (mealIndex: number, newMeal: Meal) => {
-    // Simple swap without rebalancing - just replace the meal
     const updatedMeals = [...generatedMeals];
     updatedMeals[mealIndex] = newMeal;
     setGeneratedMeals(updatedMeals);
-    showSuccessMessage(`Meal ${mealIndex + 1} updated successfully! 🎉`);
+    showSuccessMessage(`${newMeal.category === 'meal' ? 'Meal' : 'Snack'} ${mealIndex + 1} updated successfully! 🎉`);
   };
 
   const handleGenerateNewPlan = async () => {
     try {
       const meals = await generateAIMeals(macroGoals, filters, foodPreferences, foodExclusions);
-      const info = createPlanInfo(macroGoals);
+      const info = createPlanInfo(macroGoals, filters.mealConfiguration);
       
       setGeneratedMeals(meals);
       setPlanInfo(info);
@@ -116,15 +119,14 @@ const MacroMealGenerator = () => {
     }
   };
 
-  // Quick meal replacement with loading state
   const handleQuickMealReplace = async (mealIndex: number) => {
     setReplacingMealIndex(mealIndex);
     try {
-      // Generate new meals and pick one of the same type
       const newMeals = await generateAIMeals(macroGoals, filters, foodPreferences, foodExclusions);
       const currentMeal = generatedMeals[mealIndex];
       const replacement = newMeals.find(meal => 
-        meal.type === currentMeal.type && meal.name !== currentMeal.name
+        meal.category === currentMeal.category && 
+        meal.name !== currentMeal.name
       );
 
       if (replacement) {
@@ -168,6 +170,18 @@ const MacroMealGenerator = () => {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
+  // Get meal structure summary for display
+  const getMealStructureSummary = () => {
+    const meals = filters.mealConfiguration.mealCount;
+    const snacks = filters.mealConfiguration.snackCount;
+    
+    let text = `${meals} meal${meals !== 1 ? 's' : ''}`;
+    if (snacks > 0) {
+      text += ` + ${snacks} snack${snacks !== 1 ? 's' : ''}`;
+    }
+    return text;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Background Pattern */}
@@ -200,11 +214,11 @@ const MacroMealGenerator = () => {
               <Utensils className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-transparent">
-            Free Macro Calculator & AI Meal Generator
+              Free Macro Calculator & AI Meal Generator
             </h1>
           </div>
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-medium mb-6 sm:mb-8 px-4">
-            Get personalized nutrition targets and AI-generated meal plans based on your goals
+            Choose your meals & snacks, get AI-generated plans with perfect macro distribution
           </p>
           
           {/* Trust Indicators */}
@@ -219,7 +233,7 @@ const MacroMealGenerator = () => {
             </div>
             <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl">
               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <span className="text-purple-700 font-medium">⚡ Instant Generation</span>
+              <span className="text-purple-700 font-medium">🎯 Flexible Structure</span>
             </div>
           </div>
         </div>
@@ -256,10 +270,10 @@ const MacroMealGenerator = () => {
             </div>
           )}
           
-          {/* Only show filters and preferences after macros are calculated */}
+          {/* Only show structure and preferences after macros are calculated */}
           {macrosCalculated && (
             <>
-              <FiltersSection 
+              <MealSnackSelector 
                 filters={filters} 
                 setFilters={setFilters} 
                 showFilters={showFilters} 
@@ -299,11 +313,11 @@ const MacroMealGenerator = () => {
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
                     <div className="flex items-center gap-4">
                       <div className="p-2 sm:p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg">
-                        <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                        <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                       </div>
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">{planInfo.routine.name}</h2>
-                        <p className="text-slate-600 text-base sm:text-lg">{planInfo.routine.description}</p>
+                        <p className="text-slate-600 text-base sm:text-lg">{getMealStructureSummary()}</p>
                       </div>
                     </div>
                     
@@ -318,17 +332,17 @@ const MacroMealGenerator = () => {
                   {/* Daily Macro Summary */}
                   <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 sm:p-6 border border-slate-200">
                     <h3 className="font-semibold text-slate-900 mb-4 text-base sm:text-lg">
-                      Daily Total: <span className="text-xl sm:text-2xl font-bold text-indigo-600">{actualTotals.calories}</span> calories across {generatedMeals.length} meals
+                      Daily Total: <span className="text-xl sm:text-2xl font-bold text-indigo-600">{actualTotals.calories}</span> calories across {generatedMeals.length} meals/snacks
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                       {[
                         { label: 'Protein', value: actualTotals.protein, unit: 'g', target: targetMacros.protein, color: 'blue' },
                         { label: 'Carbs', value: actualTotals.carbs, unit: 'g', target: targetMacros.carbs, color: 'green' },
                         { label: 'Fat', value: actualTotals.fat, unit: 'g', target: targetMacros.fat, color: 'amber' }
-                      ].map((macro, index) => {
+                      ].map((macro, macroSummaryIndex) => {
                         const percentage = calculatePercentage(macro.value, macro.target);
                         return (
-                          <div key={index} className="text-center">
+                          <div key={`macro-summary-${macroSummaryIndex}`} className="text-center">
                             <div className={`text-xl sm:text-2xl font-bold text-${macro.color}-600`}>
                               {macro.value}{macro.unit}
                             </div>
@@ -346,12 +360,12 @@ const MacroMealGenerator = () => {
                 </div>
               </div>
 
-              {/* Meal Plan */}
+              {/* Enhanced Meal Plan */}
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
                   <h3 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
                     <Target className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-500" />
-                    Your AI-Generated Meals
+                    Your AI-Generated Daily Structure
                   </h3>
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
@@ -369,225 +383,281 @@ const MacroMealGenerator = () => {
                 </div>
 
                 <div className="space-y-4 sm:space-y-6">
-                  {generatedMeals.map((meal, index) => (
-                    <div key={meal.id} className="group relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
-                      
-                      {/* Mobile-First Responsive Card */}
-                      <div className="relative bg-gradient-to-br from-white to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 hover:border-slate-300 transition-all duration-300 hover:shadow-lg">
+                  {generatedMeals.map((meal, index) => {
+                    // Generate structure to get meal info
+                    const mealStructure = generateMealStructure(
+                      filters.mealConfiguration.mealCount, 
+                      filters.mealConfiguration.snackCount
+                    );
+                    const mealTypeInfo = mealStructure.mealTypes[index];
+                    
+                    return (
+                      <div key={`meal-${meal.id}-${index}`} className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
                         
-                        {/* Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex-shrink-0"></div>
-                                <h4 className="text-lg sm:text-xl font-bold text-slate-900">Meal {index + 1}</h4>
+                        {/* Beautiful Responsive Card */}
+                        <div className="relative bg-gradient-to-br from-white to-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 hover:border-slate-300 transition-all duration-300 hover:shadow-lg">
+                          
+                          {/* Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                                    meal.category === 'meal' 
+                                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600' 
+                                      : 'bg-gradient-to-r from-orange-400 to-red-500'
+                                  }`}></div>
+                                  <h4 className="text-lg sm:text-xl font-bold text-slate-900">
+                                    {mealTypeInfo?.name || `${meal.category} ${index + 1}`}
+                                  </h4>
+                                </div>
+                                <h5 className="text-lg sm:text-xl font-semibold text-indigo-600 break-words">{meal.name}</h5>
                               </div>
-                              <h5 className="text-lg sm:text-xl font-semibold text-indigo-600 break-words">{meal.name}</h5>
+                              
+                              {/* Enhanced Tags */}
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                <span className={`px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-medium capitalize ${
+                                  meal.category === 'meal' 
+                                    ? 'bg-emerald-100 text-emerald-700' 
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {meal.category === 'meal' ? '🍽️ Main Meal' : '🥨 Snack'}
+                                </span>
+                                <span className="px-2 sm:px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs sm:text-sm font-medium capitalize">
+                                  {meal.type}
+                                </span>
+                                {meal.dietary !== 'none' && meal.dietary !== 'ai-generated' && (
+                                  <span className="px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-sm font-medium capitalize">
+                                    {meal.dietary}
+                                  </span>
+                                )}
+                                {mealTypeInfo && (
+                                  <span className="px-2 sm:px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs sm:text-sm font-medium">
+                                    {mealTypeInfo.caloriePercentage}% of daily calories
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             
-                            {/* Tags */}
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                              <span className="px-2 sm:px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs sm:text-sm font-medium capitalize">
-                                {meal.type}
-                              </span>
-                              {meal.dietary !== 'none' && meal.dietary !== 'ai-generated' && (
-                                <span className="px-2 sm:px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs sm:text-sm font-medium capitalize">
-                                  {meal.dietary}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Action Buttons */}
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={() => handleQuickMealReplace(index)}
-                              disabled={replacingMealIndex === index}
-                              className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:scale-100"
-                              title="Generate new meal"
-                            >
-                              {replacingMealIndex === index ? (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 relative">
-                                      <div className="absolute inset-0 rounded-full border-2 border-red-200"></div>
-                                      <div className="absolute inset-0 rounded-full border-2 border-red-600 border-t-transparent animate-spin"></div>
+                            {/* Action Buttons */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 w-full sm:w-auto">
+                              <button
+                                onClick={() => handleQuickMealReplace(index)}
+                                disabled={replacingMealIndex === index}
+                                className="flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-red-100 to-orange-100 hover:from-red-200 hover:to-orange-200 text-red-700 rounded-lg transition-all duration-300 hover:scale-105 text-sm font-medium disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                title="Generate new meal/snack"
+                              >
+                                {replacingMealIndex === index ? (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-4 h-4 relative">
+                                        <div className="absolute inset-0 rounded-full border-2 border-red-200"></div>
+                                        <div className="absolute inset-0 rounded-full border-2 border-red-600 border-t-transparent animate-spin"></div>
+                                      </div>
+                                      <span>Generating...</span>
                                     </div>
-                                    <span>Generating...</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-sm">🔄</span>
-                                  Replace
-                                </>
-                              )}
-                            </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-sm">🔄</span>
+                                    Replace
+                                  </>
+                                )}
+                              </button>
 
-                            <div className="w-full sm:w-auto">
-                              <MealSwapper
-                                currentMeal={meal}
-                                mealIndex={index}
-                                macroGoals={macroGoals}
-                                filters={filters}
-                                favoriteFoods={foodPreferences}
-                                excludedFoods={foodExclusions}
-                                onMealSwap={handleMealSwap}
-                              />
+                              <div className="w-full sm:w-auto">
+                                <MealSwapper
+                                  currentMeal={meal}
+                                  mealIndex={index}
+                                  macroGoals={macroGoals}
+                                  filters={filters}
+                                  favoriteFoods={foodPreferences}
+                                  excludedFoods={foodExclusions}
+                                  onMealSwap={handleMealSwap}
+                                />
+                              </div>
                             </div>
+
+                            {/* Enhanced Loading Overlay */}
+                            {replacingMealIndex === index && (
+                              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center z-10">
+                                <div className="text-center p-6">
+                                  <div className="relative w-16 h-16 mx-auto mb-4">
+                                    <div className="absolute inset-0 rounded-full border-4 border-red-100"></div>
+                                    <div className="absolute inset-0 rounded-full border-4 border-red-500 border-t-transparent animate-spin"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className="text-2xl">🤖</span>
+                                    </div>
+                                  </div>
+                                  
+                                  <h4 className="font-semibold text-slate-900 mb-2">
+                                    Generating New {meal.category === 'meal' ? 'Meal' : 'Snack'}
+                                  </h4>
+                                  <p className="text-sm text-slate-600 mb-4">
+                                    AI is creating a {meal.category === 'meal' ? 'delicious meal' : 'perfect snack'} alternative...
+                                  </p>
+                                  
+                                  <div className="w-48 bg-slate-200 rounded-full h-2 mx-auto">
+                                    <div className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
+                                  </div>
+                                  
+                                  <p className="text-xs text-slate-500 mt-3">This usually takes 3-5 seconds</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Loading Overlay for Meal Replacement */}
-                          {replacingMealIndex === index && (
-                            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center z-10">
-                              <div className="text-center p-6">
-                                <div className="relative w-16 h-16 mx-auto mb-4">
-                                  {/* Outer ring */}
-                                  <div className="absolute inset-0 rounded-full border-4 border-red-100"></div>
-                                  {/* Animated inner ring */}
-                                  <div className="absolute inset-0 rounded-full border-4 border-red-500 border-t-transparent animate-spin"></div>
-                                  {/* Center icon */}
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-2xl">🤖</span>
-                                  </div>
+                          {/* Enhanced Macro Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6 bg-white rounded-xl p-3 sm:p-4 border border-slate-100">
+                            {[
+                              { label: 'Calories', value: meal.calories, color: 'slate' },
+                              { label: 'Protein', value: `${meal.protein}g`, color: 'blue' },
+                              { label: 'Carbs', value: `${meal.carbs}g`, color: 'green' },
+                              { label: 'Fat', value: `${meal.fat}g`, color: 'amber' }
+                            ].map((macro, macroIndex) => (
+                              <div key={`macro-${index}-${macroIndex}`} className="text-center">
+                                <div className={`text-lg sm:text-xl font-bold text-${macro.color}-600 leading-tight`}>
+                                  {macro.value}
                                 </div>
-                                
-                                <h4 className="font-semibold text-slate-900 mb-2">Generating New Meal</h4>
-                                <p className="text-sm text-slate-600 mb-4">AI is creating a delicious alternative...</p>
-                                
-                                {/* Progress Bar */}
-                                <div className="w-48 bg-slate-200 rounded-full h-2 mx-auto">
-                                  <div className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
-                                </div>
-                                
-                                <p className="text-xs text-slate-500 mt-3">This usually takes 3-5 seconds</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Macro Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6 bg-white rounded-xl p-3 sm:p-4 border border-slate-100">
-                          {[
-                            { label: 'Calories', value: meal.calories, color: 'slate' },
-                            { label: 'Protein', value: `${meal.protein}g`, color: 'blue' },
-                            { label: 'Carbs', value: `${meal.carbs}g`, color: 'green' },
-                            { label: 'Fat', value: `${meal.fat}g`, color: 'amber' }
-                          ].map((macro, macroIndex) => (
-                            <div key={macroIndex} className="text-center">
-                              <div className={`text-lg sm:text-xl font-bold text-${macro.color}-600 leading-tight`}>
-                                {macro.value}
-                              </div>
-                              <div className="text-xs font-medium text-slate-500 mt-1">
-                                {macro.label}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Ingredients Section */}
-                        <div>
-                          <h5 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-                            <Utensils className="h-4 w-4 text-slate-600" />
-                            Ingredients
-                          </h5>
-                          
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
-                            {meal.ingredients.map((ingredient, ingredientIndex) => (
-                              <div key={ingredientIndex} className="flex items-start gap-3 p-3 bg-white rounded-lg sm:rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
-                                <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex-shrink-0 mt-2"></div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                                    <span className="font-semibold text-slate-900 text-sm">{ingredient.quantity}</span>
-                                    <span className="text-slate-700 text-sm break-words">{ingredient.item}</span>
-                                    <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium w-fit">
-                                      🤖 AI
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-slate-500 break-words">
-                                    {ingredient.serving}
-                                  </div>
+                                <div className="text-xs font-medium text-slate-500 mt-1">
+                                  {macro.label}
                                 </div>
                               </div>
                             ))}
                           </div>
 
-                          {/* Cooking Instructions */}
-                          {(meal as any).instructions && (
-                            <div className="mt-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
-                              <h6 className="font-medium text-blue-900 mb-2 text-sm">🍳 Instructions:</h6>
-                              <ol className="text-sm text-blue-800 space-y-1">
-                                {(meal as any).instructions.map((step: string, stepIndex: number) => (
-                                  <li key={stepIndex} className="flex gap-2">
-                                    <span className="font-medium flex-shrink-0">{stepIndex + 1}.</span>
-                                    <span className="break-words">{step}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                              {(meal as any).cookingTime && (
-                                <p className="text-xs text-blue-600 mt-2 break-words">
-                                  ⏱️ Cooking time: {(meal as any).cookingTime}
-                                </p>
-                              )}
+                          {/* Enhanced Ingredients Section */}
+                          <div>
+                            <h5 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                              <Utensils className="h-4 w-4 text-slate-600" />
+                              Ingredients
+                            </h5>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+                              {meal.ingredients.map((ingredient, ingredientIndex) => (
+                                <div key={`ingredient-${meal.id}-${ingredientIndex}`} className="flex items-start gap-3 p-3 bg-white rounded-lg sm:rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
+                                    meal.category === 'meal' 
+                                      ? 'bg-gradient-to-r from-emerald-400 to-teal-500' 
+                                      : 'bg-gradient-to-r from-orange-400 to-red-400'
+                                  }`}></div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                                      <span className="font-semibold text-slate-900 text-sm">{ingredient.quantity}</span>
+                                      <span className="text-slate-700 text-sm break-words">{ingredient.item}</span>
+                                      <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium w-fit">
+                                        🤖 AI
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 break-words">
+                                      {ingredient.serving}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          )}
+
+                            {/* Enhanced Cooking Instructions */}
+                            {(meal as any).instructions && (
+                              <div className="mt-4 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                <h6 className="font-medium text-blue-900 mb-2 text-sm">
+                                  {meal.category === 'meal' ? '🍳 Cooking Instructions:' : '🥨 Preparation:'}
+                                </h6>
+                                <ol className="text-sm text-blue-800 space-y-1">
+                                  {(meal as any).instructions.map((step: string, stepIndex: number) => (
+                                    <li key={`instruction-${meal.id}-${stepIndex}`} className="flex gap-2">
+                                      <span className="font-medium flex-shrink-0">{stepIndex + 1}.</span>
+                                      <span className="break-words">{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                                {(meal as any).cookingTime && (
+                                  <p className="text-xs text-blue-600 mt-2 break-words">
+                                    ⏱️ {meal.category === 'meal' ? 'Cooking' : 'Prep'} time: {(meal as any).cookingTime}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* AI Description if available */}
+                            {(meal as any).description && (
+                              <div className="mt-4 p-3 sm:p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                                <h6 className="font-medium text-indigo-900 mb-2 text-sm flex items-center gap-2">
+                                  <Sparkles className="h-4 w-4" />
+                                  Why This {meal.category === 'meal' ? 'Meal' : 'Snack'} Works:
+                                </h6>
+                                <p className="text-sm text-indigo-800">{(meal as any).description}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {/* AI Features Info */}
+                {/* Enhanced AI Features Info */}
                 <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                     <h4 className="font-semibold text-indigo-900 flex items-center gap-2 text-sm sm:text-base">
                       <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
-                      AI-Powered Meal Planning
+                      AI-Powered Flexible Meal Planning
                     </h4>
                   </div>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
                       <p className="text-indigo-700 text-sm">
-                        <strong>🎯 Precision Targeting:</strong> AI calculates meals to hit your exact macro goals.
+                        <strong>📅 Your Choice:</strong> {getMealStructureSummary()} with smart macro distribution.
                       </p>
                       <p className="text-indigo-700 text-sm">
-                        <strong>🔄 Instant Alternatives:</strong> Don't like a meal? Get instant AI-generated replacements.
+                        <strong>🍽️ Meal Intelligence:</strong> Full recipes for meals, simple prep for snacks.
                       </p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-indigo-700 text-sm">
-                        <strong>🍽️ Infinite Variety:</strong> Never run out of meal ideas with AI creativity.
+                        <strong>🎯 Precision Targeting:</strong> Each item hits its exact calorie percentage target.
                       </p>
                       <p className="text-indigo-700 text-sm">
-                        <strong>⚡ Real-Time Generation:</strong> All meals created fresh based on your preferences.
+                        <strong>🔄 Smart Swapping:</strong> Replacements maintain meal type and appropriate sizing.
                       </p>
                     </div>
                   </div>
                   
-                  {/* Data Quality Assurance */}
+                  {/* Current Structure Breakdown */}
                   <div className="bg-white/50 rounded-xl p-3 sm:p-4 border border-indigo-200">
                     <h5 className="font-medium text-indigo-900 mb-2 flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4" />
-                      Science-Based Nutrition Calculations
+                      <Calendar className="h-4 w-4" />
+                      Your Current Structure ({filters.mealConfiguration.mealCount + filters.mealConfiguration.snackCount} items)
                     </h5>
-                    <p className="text-indigo-700 text-xs mb-3">
-                      Your macros are calculated using proven formulas and adjusted based on your specific goals and activity level.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                        <span className="text-emerald-700">Mifflin-St Jeor equation</span>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {(() => {
+                        const structure = generateMealStructure(
+                          filters.mealConfiguration.mealCount, 
+                          filters.mealConfiguration.snackCount
+                        );
+                        return structure.mealTypes.map((item, structureIndex) => (
+                          <span 
+                            key={`structure-${structureIndex}-${item.type}`}
+                            className={`px-2 py-1 rounded-full font-medium ${
+                              item.category === 'meal'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-orange-100 text-orange-700'
+                            }`}
+                          >
+                            {item.category === 'meal' ? '🍽️' : '🥨'} {item.name}: {item.caloriePercentage}%
+                          </span>
+                        ));
+                      })()}
+                    </div>
+                    
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-indigo-700">
+                      <div>
+                        <p><strong>Meals ({filters.mealConfiguration.mealCount}):</strong> Complex recipes, complete nutrition</p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        <span className="text-blue-700">Goal-based adjustments</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                        <span className="text-purple-700">Real-time generation</span>
+                      <div>
+                        <p><strong>Snacks ({filters.mealConfiguration.snackCount}):</strong> Simple ingredients, quick prep</p>
                       </div>
                     </div>
                   </div>
