@@ -26,7 +26,8 @@ const MealGenerator: React.FC<MealGeneratorProps> = ({
   const [customPrompt, setCustomPrompt] = useState('');
 
   // Check if AI is available
-  const hasAI = !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
+  // In components/MealGenerator.tsx, improve the check
+const hasAI = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
 
   // Enhanced plan info creation with meal configuration
   const createPlanInfo = (macroGoals: MacroGoals, mealConfig: any) => {

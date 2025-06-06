@@ -33,8 +33,14 @@ export interface Meal {
   carbs: number;
   fat: number;
   ingredients: Ingredient[];
+  // Optional AI-generated properties
+  description?: string;
+  instructions?: string[];
+  cookingTime?: string;
+  difficulty?: string;
+  cuisineStyle?: string;
+  cookingMethod?: string;
 }
-
 // Helper function to generate dynamic meal structure
 export function generateMealStructure(mealCount: number, snackCount: number) {
   const totalItems = mealCount + snackCount;
