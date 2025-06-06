@@ -23,7 +23,8 @@ const MacroMealGenerator = () => {
       mealCount: 3,
       snackCount: 2
     },
-    dietary: 'all'
+    dietary: 'all',
+    cookingTime: 'any' // Add this line
   });
   
   const [showFilters, setShowFilters] = useState(false);

@@ -14,6 +14,7 @@ export interface MealConfiguration {
 export interface Filters {
   mealConfiguration: MealConfiguration;
   dietary: string;
+  cookingTime?: string; // Add this line
 }
 
 export interface Ingredient {
