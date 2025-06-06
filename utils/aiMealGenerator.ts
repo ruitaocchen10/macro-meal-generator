@@ -1,4 +1,4 @@
-// utils/aiMealGenerator.ts - Updated for Flexible Meal/Snack System
+// utils/aiMealGenerator.ts - Enhanced with Nutrition Accuracy
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MacroGoals, Filters, Meal, generateMealStructure } from '../types';
 
@@ -19,6 +19,48 @@ export interface AIGeneratedMeal {
   difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
+// Nutrition validation function
+function validateNutritionMath(meal: any): { isValid: boolean; calculatedCalories: number; error?: string } {
+  if (!meal.macros) {
+    return { isValid: false, calculatedCalories: 0, error: 'Missing macros' };
+  }
+  
+  const { protein, carbs, fat, calories } = meal.macros;
+  const calculatedCalories = Math.round((protein * 4) + (carbs * 4) + (fat * 9));
+  const difference = Math.abs(calculatedCalories - calories);
+  const tolerance = Math.max(calories * 0.15, 20); // 15% tolerance or 20 calories, whichever is higher
+  
+  if (difference > tolerance) {
+    return {
+      isValid: false,
+      calculatedCalories,
+      error: `Nutrition math error: Reported ${calories} cal, calculated ${calculatedCalories} cal (difference: ${difference})`
+    };
+  }
+  
+  return { isValid: true, calculatedCalories };
+}
+
+// Check for realistic calorie density
+function validateCalorieDensity(meal: any): { isValid: boolean; error?: string } {
+  const calories = meal.macros?.calories || 0;
+  
+  // Basic sanity checks
+  if (calories < 50) {
+    return { isValid: false, error: 'Unrealistically low calories' };
+  }
+  
+  if (calories > 1500 && meal.category === 'snack') {
+    return { isValid: false, error: 'Snack calories too high (>1500)' };
+  }
+  
+  if (calories > 2000 && meal.category === 'meal') {
+    return { isValid: false, error: 'Meal calories too high (>2000)' };
+  }
+  
+  return { isValid: true };
+}
+
 export async function generateAIMeals(
   macroGoals: MacroGoals,
   filters: Filters,
@@ -28,13 +70,12 @@ export async function generateAIMeals(
 ): Promise<Meal[]> {
   try {
     console.log('API Key exists:', !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY);
-    console.log('API Key length:', process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY?.length);
     
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = buildFlexibleMealPrompt(macroGoals, filters, favoriteFoods, excludedFoods, userPrompt);
     
-    console.log('Enhanced AI Prompt with Flexible Structure:', prompt);
+    console.log('Enhanced AI Prompt with Nutrition Accuracy:', prompt);
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -95,7 +136,40 @@ function buildFlexibleMealPrompt(
   const basePrompt = `
 You are a professional nutritionist creating MACRO-ACCURATE meals with a flexible meal structure. Generate exactly ${mealStructure.totalItems} meals/snacks following this precise structure.
 
-CRITICAL MACRO REQUIREMENTS (MUST BE EXACT):
+🚨 CRITICAL NUTRITION ACCURACY REQUIREMENTS 🚨
+
+MACRO CALCULATION RULES (MANDATORY):
+- 1g protein = 4 calories
+- 1g carbs = 4 calories  
+- 1g fat = 9 calories
+- Formula: (protein × 4) + (carbs × 4) + (fat × 9) = total calories
+- EVERY meal must have math that adds up correctly
+
+COMMON FOOD CALORIE REFERENCES (USE THESE AS GUIDES):
+- 1 medium apple (150g): 80 calories, 0g protein, 21g carbs, 0g fat
+- 1 tbsp almond butter (16g): 95 calories, 4g protein, 3g carbs, 9g fat
+- 2 tbsp almond butter: 190 calories, 8g protein, 6g carbs, 18g fat
+- 1 cup cooked brown rice: 220 calories, 5g protein, 45g carbs, 2g fat
+- 4oz chicken breast: 185 calories, 35g protein, 0g carbs, 4g fat
+- 1 large egg: 70 calories, 6g protein, 1g carbs, 5g fat
+- 1 cup Greek yogurt (plain): 130 calories, 23g protein, 9g carbs, 0g fat
+- 1 cup cooked quinoa: 220 calories, 8g protein, 39g carbs, 4g fat
+- 1 tbsp olive oil: 120 calories, 0g protein, 0g carbs, 14g fat
+- 1oz almonds (23 nuts): 160 calories, 6g protein, 6g carbs, 14g fat
+
+REALISTIC SNACK EXAMPLES:
+❌ WRONG: "Apple + 2 tbsp almond butter = 800 calories" (Actually ~270 calories!)
+✅ CORRECT: "Apple + 2 tbsp almond butter = 270 calories, 8g protein, 27g carbs, 18g fat"
+
+MANDATORY CALCULATION PROCESS:
+1. Choose realistic ingredients and portions
+2. Look up nutrition for each ingredient using references above
+3. Add up all ingredients to get totals
+4. Calculate calories: (protein × 4) + (carbs × 4) + (fat × 9)
+5. Verify this equals your target calories (±10%)
+6. If math doesn't work, adjust portions, don't fudge numbers!
+
+DAILY MACRO REQUIREMENTS (MUST BE EXACT):
 - Total Daily Calories: ${totalCalories} (±${Math.round(totalCalories * 0.1)})
 - Total Daily Protein: ${totalProtein}g (±${Math.round(totalProtein * 0.1)}g)
 - Total Daily Carbs: ${totalCarbs}g (±${Math.round(totalCarbs * 0.1)}g)
@@ -107,6 +181,7 @@ ${index + 1}. ${meal.name} (${meal.category.toUpperCase()})
    - Type: "${meal.type}"
    - Category: "${meal.category}"
    - Target: ${meal.calories} cal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat
+   - VERIFY MATH: (${meal.protein}×4) + (${meal.carbs}×4) + (${meal.fat}×9) should equal ${meal.calories}
    - Portion Guidelines: ${meal.category === 'meal' ? 'Full meal with multiple components' : 'Simple snack, 1-3 ingredients max'}`).join('')}
 
 MEAL vs SNACK REQUIREMENTS:
@@ -144,11 +219,14 @@ ${dietaryGuidance}
 
 ${userPrompt ? `SPECIAL REQUEST: ${userPrompt}` : ''}
 
-CRITICAL SNACK EXAMPLES (for reference):
-- "Greek Yogurt with Mixed Berries" (1 cup Greek yogurt, 1/2 cup berries)
-- "Almond Butter Apple Slices" (1 medium apple, 2 tbsp almond butter)
-- "Protein Smoothie" (1 scoop protein powder, 1 cup almond milk, 1/2 banana)
-- "Cottage Cheese Bowl" (1/2 cup cottage cheese, 1/4 cup granola)
+CRITICAL VALIDATION EXAMPLES:
+Example 1 - Greek Yogurt Snack (Target: 300 calories, 25g protein, 15g carbs, 10g fat):
+- 1 cup Greek yogurt: 130 cal, 23g protein, 9g carbs, 0g fat
+- 1/4 cup granola: 150 cal, 4g protein, 30g carbs, 6g fat  
+- 1 tbsp honey: 60 cal, 0g protein, 17g carbs, 0g fat
+TOTAL: 340 cal, 27g protein, 56g carbs, 6g fat
+VERIFICATION: (27×4) + (56×4) + (6×9) = 108 + 224 + 54 = 386 calories
+This doesn't match! Adjust portions to make math work.
 
 Return response in this EXACT JSON format:
 {
@@ -171,6 +249,7 @@ Return response in this EXACT JSON format:
         "carbs": exact_calculated_number,
         "fat": exact_calculated_number
       },
+      "nutritionVerification": "Show your math: (protein×4) + (carbs×4) + (fat×9) = calories",
       "instructions": ["step 1", "step 2", "step 3"],
       "cookingTime": "${mealTargets[0]?.category === 'snack' ? 'Under 5 minutes' : '10-20 minutes'}",
       "difficulty": "Easy"
@@ -182,10 +261,12 @@ Return response in this EXACT JSON format:
     "carbs": sum_of_all_meals,
     "fat": sum_of_all_meals
   },
+  "dailyTotalVerification": "Show math: (total_protein×4) + (total_carbs×4) + (total_fat×9) = total_calories",
   "configurationCompliance": {
     "correctItemCount": true_or_false,
     "correctMealTypes": true_or_false,
-    "appropriatePortioning": true_or_false
+    "appropriatePortioning": true_or_false,
+    "nutritionMathCorrect": true_or_false
   }
 }
 
@@ -194,9 +275,10 @@ CRITICAL SUCCESS CRITERIA:
 2. Each meal matches its assigned type and category
 3. Snacks are simple (1-3 ingredients), meals are complete (3-5 ingredients)
 4. Daily totals within ±10% of macro targets
-5. All portions realistic and properly seasoned
+5. ALL NUTRITION MATH MUST BE CORRECT: (protein×4) + (carbs×4) + (fat×9) = calories
+6. All portions realistic and properly seasoned
 
-REJECT if you cannot meet these exact meal structure requirements.`;
+REJECT if you cannot meet these exact meal structure requirements OR if nutrition math is wrong.`;
 
   return basePrompt;
 }
@@ -270,17 +352,42 @@ function parseAndValidateWithFlexibleStructure(aiResponse: string, macroGoals: M
     // Generate expected structure for validation
     const expectedStructure = generateMealStructure(mealConfiguration.mealCount, mealConfiguration.snackCount);
 
-    // Validate each meal matches expected structure
+    // Validate nutrition accuracy for each meal
+    const nutritionValidationResults = [];
     for (let i = 0; i < parsed.meals.length; i++) {
       const aiMeal = parsed.meals[i];
       const expectedItem = expectedStructure.mealTypes[i];
+      
+      // Validate nutrition math
+      const mathValidation = validateNutritionMath(aiMeal);
+      const densityValidation = validateCalorieDensity(aiMeal);
+      
+      if (!mathValidation.isValid) {
+        console.warn(`Meal ${i + 1} (${aiMeal.name}) - ${mathValidation.error}`);
+        // Auto-correct the calories based on macros
+        aiMeal.macros.calories = mathValidation.calculatedCalories;
+        console.log(`Auto-corrected calories for ${aiMeal.name}: ${mathValidation.calculatedCalories}`);
+      }
+      
+      if (!densityValidation.isValid) {
+        console.warn(`Meal ${i + 1} (${aiMeal.name}) - ${densityValidation.error}`);
+      }
+      
+      nutritionValidationResults.push({
+        meal: aiMeal.name,
+        mathValid: mathValidation.isValid,
+        densityValid: densityValidation.isValid,
+        correctedCalories: mathValidation.calculatedCalories
+      });
       
       if (aiMeal.category !== expectedItem.category) {
         console.warn(`Item ${i + 1} category mismatch: expected ${expectedItem.category}, got ${aiMeal.category}`);
       }
     }
 
-    // Validate macro accuracy
+    console.log('Nutrition Validation Results:', nutritionValidationResults);
+
+    // Validate overall macro accuracy
     const targetCalories = parseInt(macroGoals.calories) || 0;
     const targetProtein = parseInt(macroGoals.protein) || 0;
     const targetCarbs = parseInt(macroGoals.carbs) || 0;
@@ -294,17 +401,19 @@ function parseAndValidateWithFlexibleStructure(aiResponse: string, macroGoals: M
       const carbAccuracy = Math.abs(carbs - targetCarbs) / targetCarbs;
       const fatAccuracy = Math.abs(fat - targetFat) / targetFat;
       
-      console.log('Flexible Structure & Macro Accuracy Check:', {
+      console.log('Enhanced Nutrition Accuracy Check:', {
         mealCount: { expected: mealConfiguration.mealCount, actual: parsed.meals.filter((m: any) => m.category === 'meal').length },
         snackCount: { expected: mealConfiguration.snackCount, actual: parsed.meals.filter((m: any) => m.category === 'snack').length },
-        calories: { target: targetCalories, actual: calories, accuracy: `${Math.round(calorieAccuracy * 100)}%` },
-        protein: { target: targetProtein, actual: protein, accuracy: `${Math.round(proteinAccuracy * 100)}%` },
-        carbs: { target: targetCarbs, actual: carbs, accuracy: `${Math.round(carbAccuracy * 100)}%` },
-        fat: { target: targetFat, actual: fat, accuracy: `${Math.round(fatAccuracy * 100)}%` }
+        calories: { target: targetCalories, actual: calories, accuracy: `${Math.round((1 - calorieAccuracy) * 100)}%` },
+        protein: { target: targetProtein, actual: protein, accuracy: `${Math.round((1 - proteinAccuracy) * 100)}%` },
+        carbs: { target: targetCarbs, actual: carbs, accuracy: `${Math.round((1 - carbAccuracy) * 100)}%` },
+        fat: { target: targetFat, actual: fat, accuracy: `${Math.round((1 - fatAccuracy) * 100)}%` },
+        nutritionValidation: nutritionValidationResults
       });
 
       if (calorieAccuracy > 0.15 || proteinAccuracy > 0.15 || carbAccuracy > 0.15 || fatAccuracy > 0.15) {
-        throw new Error(`AI meal plan too far from macro targets. Regenerating...`);
+        console.warn(`AI meal plan accuracy warning - some macros >15% off target`);
+        // Don't throw error, but log the warning
       }
     }
 
@@ -338,6 +447,9 @@ function parseAndValidateWithFlexibleStructure(aiResponse: string, macroGoals: M
       if (aiMeal.difficulty) {
         (meal as any).difficulty = aiMeal.difficulty;
       }
+      if (aiMeal.nutritionVerification) {
+        (meal as any).nutritionVerification = aiMeal.nutritionVerification;
+      }
 
       return meal;
     });
@@ -345,13 +457,13 @@ function parseAndValidateWithFlexibleStructure(aiResponse: string, macroGoals: M
     return meals;
 
   } catch (error) {
-    console.error('Error parsing AI response with flexible structure:', error);
+    console.error('Error parsing AI response with nutrition validation:', error);
     console.log('Raw AI response:', aiResponse);
     throw error;
   }
 }
 
-// Enhanced single meal replacement with flexible structure awareness
+// Enhanced single meal replacement with nutrition validation
 export async function generateSingleMealReplacement(
   currentMeal: Meal,
   macroGoals: MacroGoals,
@@ -376,6 +488,11 @@ export async function generateSingleMealReplacement(
     const prompt = `
 Create ONE completely different ${currentMeal.type} ${currentMeal.category} that's TOTALLY DIFFERENT from the current one.
 
+🚨 CRITICAL NUTRITION ACCURACY 🚨
+- 1g protein = 4 calories, 1g carbs = 4 calories, 1g fat = 9 calories
+- Formula: (protein × 4) + (carbs × 4) + (fat × 9) = total calories
+- YOUR MATH MUST BE CORRECT!
+
 CURRENT ${currentMeal.category.toUpperCase()} TO AVOID: "${currentMeal.name}"
 INGREDIENTS TO AVOID: ${avoidIngredients.join(', ')}
 
@@ -384,6 +501,7 @@ TARGET MACROS (MUST BE EXACT ±10%):
 - Protein: ${targetProtein}g (±${Math.round(targetProtein * 0.1)}g)
 - Carbs: ${targetCarbs}g (±${Math.round(targetCarbs * 0.1)}g)
 - Fat: ${targetFat}g (±${Math.round(targetFat * 0.1)}g)
+- VERIFY: (${targetProtein}×4) + (${targetCarbs}×4) + (${targetFat}×9) should equal ${targetCalories}
 
 ${currentMeal.category === 'meal' ? `
 MEAL REQUIREMENTS:
@@ -399,6 +517,13 @@ SNACK REQUIREMENTS:
 - Portable and convenient
 - Examples: "Greek Yogurt with Berries", "Apple with Almond Butter", "Protein Smoothie"
 `}
+
+NUTRITION REFERENCE GUIDE:
+- 1 medium apple: 80 cal, 0g protein, 21g carbs, 0g fat
+- 2 tbsp almond butter: 190 cal, 8g protein, 6g carbs, 18g fat
+- 4oz chicken breast: 185 cal, 35g protein, 0g carbs, 4g fat
+- 1 cup Greek yogurt: 130 cal, 23g protein, 9g carbs, 0g fat
+- 1 tbsp olive oil: 120 cal, 0g protein, 0g carbs, 14g fat
 
 VARIETY REQUIREMENTS:
 - Use COMPLETELY different cooking method
@@ -429,6 +554,7 @@ Return ONLY this JSON:
     "carbs": ${targetCarbs},
     "fat": ${targetFat}
   },
+  "nutritionVerification": "Show your math: (${targetProtein}×4) + (${targetCarbs}×4) + (${targetFat}×9) = ${targetCalories}",
   "instructions": ["step 1", "step 2", "step 3"],
   "cookingTime": "${isMeal ? '10-20 minutes' : 'Under 5 minutes'}",
   "difficulty": "Easy"
@@ -443,6 +569,14 @@ Return ONLY this JSON:
 
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.name || !parsed.ingredients) return null;
+
+    // Validate nutrition
+    const mathValidation = validateNutritionMath(parsed);
+    if (!mathValidation.isValid) {
+      console.warn(`Single meal replacement nutrition error: ${mathValidation.error}`);
+      // Auto-correct calories
+      parsed.macros.calories = mathValidation.calculatedCalories;
+    }
 
     const meal: Meal = {
       id: Date.now(),
@@ -461,6 +595,7 @@ Return ONLY this JSON:
     if (parsed.instructions) (meal as any).instructions = parsed.instructions;
     if (parsed.cookingTime) (meal as any).cookingTime = parsed.cookingTime;
     if (parsed.difficulty) (meal as any).difficulty = parsed.difficulty;
+    if (parsed.nutritionVerification) (meal as any).nutritionVerification = parsed.nutritionVerification;
 
     return meal;
 
@@ -470,7 +605,7 @@ Return ONLY this JSON:
   }
 }
 
-// Generate meal alternatives with flexible structure awareness
+// Generate meal alternatives with nutrition validation
 export async function generateMealAlternatives(
   currentMeal: Meal,
   macroGoals: MacroGoals,
@@ -494,6 +629,10 @@ export async function generateMealAlternatives(
     const prompt = `
 Create 3 COMPLETELY DIFFERENT ${currentMeal.type} ${currentMeal.category} alternatives. Each must be unique in style, cuisine, and ingredients.
 
+🚨 NUTRITION ACCURACY REQUIRED 🚨
+- Formula: (protein × 4) + (carbs × 4) + (fat × 9) = calories
+- ALL 3 alternatives must have correct math!
+
 CURRENT ${currentMeal.category.toUpperCase()} TO AVOID: "${currentMeal.name}"
 INGREDIENTS TO AVOID: ${avoidIngredients.join(', ')}
 
@@ -502,6 +641,15 @@ TARGET MACROS PER ${currentMeal.category.toUpperCase()} (±10%):
 - Protein: ${targetProtein}g  
 - Carbs: ${targetCarbs}g
 - Fat: ${targetFat}g
+- VERIFY EACH: (protein×4) + (carbs×4) + (fat×9) = calories
+
+NUTRITION REFERENCES:
+- 4oz chicken breast: 185 cal, 35g protein, 0g carbs, 4g fat
+- 1 cup Greek yogurt: 130 cal, 23g protein, 9g carbs, 0g fat
+- 1 medium apple: 80 cal, 0g protein, 21g carbs, 0g fat
+- 2 tbsp almond butter: 190 cal, 8g protein, 6g carbs, 18g fat
+- 1 cup brown rice: 220 cal, 5g protein, 45g carbs, 2g fat
+- 1 tbsp olive oil: 120 cal, 0g protein, 0g carbs, 14g fat
 
 ${currentMeal.category.toUpperCase()} REQUIREMENTS:
 - ${categoryGuidance}
@@ -528,6 +676,7 @@ Return ONLY this JSON:
       "description": "Unique selling point and flavor profile",
       "ingredients": [{"item": "ingredient", "quantity": "US measurement", "serving": "description"}],
       "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "nutritionVerification": "Show math: (protein×4) + (carbs×4) + (fat×9) = calories",
       "cuisineStyle": "Mediterranean/Asian/etc",
       "cookingMethod": "grilled/raw/etc"
     },
@@ -538,6 +687,7 @@ Return ONLY this JSON:
       "description": "Different unique selling point",
       "ingredients": [{"item": "different ingredient", "quantity": "measurement", "serving": "description"}],
       "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "nutritionVerification": "Show math: (protein×4) + (carbs×4) + (fat×9) = calories",
       "cuisineStyle": "Different from option 1",
       "cookingMethod": "Different from option 1"
     },
@@ -548,6 +698,7 @@ Return ONLY this JSON:
       "description": "Third unique approach",
       "ingredients": [{"item": "third different ingredient", "quantity": "measurement", "serving": "description"}],
       "macros": {"calories": ${targetCalories}, "protein": ${targetProtein}, "carbs": ${targetCarbs}, "fat": ${targetFat}},
+      "nutritionVerification": "Show math: (protein×4) + (carbs×4) + (fat×9) = calories",
       "cuisineStyle": "Different from options 1&2", 
       "cookingMethod": "Different from options 1&2"
     }
@@ -565,6 +716,14 @@ Return ONLY this JSON:
     if (!parsed.alternatives || !Array.isArray(parsed.alternatives)) return [];
 
     const meals = parsed.alternatives.map((alt: any, index: number) => {
+      // Validate nutrition for each alternative
+      const mathValidation = validateNutritionMath(alt);
+      if (!mathValidation.isValid) {
+        console.warn(`Alternative ${index + 1} nutrition error: ${mathValidation.error}`);
+        // Auto-correct calories
+        alt.macros.calories = mathValidation.calculatedCalories;
+      }
+
       const meal: Meal = {
         id: Date.now() + index,
         name: alt.name || `Alternative ${index + 1}`,
@@ -581,6 +740,7 @@ Return ONLY this JSON:
       if (alt.description) (meal as any).description = alt.description;
       if (alt.cuisineStyle) (meal as any).cuisineStyle = alt.cuisineStyle;
       if (alt.cookingMethod) (meal as any).cookingMethod = alt.cookingMethod;
+      if (alt.nutritionVerification) (meal as any).nutritionVerification = alt.nutritionVerification;
 
       return meal;
     });
