@@ -169,20 +169,26 @@ MANDATORY CALCULATION PROCESS:
 5. Verify this equals your target calories (±10%)
 6. If math doesn't work, adjust portions, don't fudge numbers!
 
-DAILY MACRO REQUIREMENTS (MUST BE EXACT):
-- Total Daily Calories: ${totalCalories} (±${Math.round(totalCalories * 0.1)})
-- Total Daily Protein: ${totalProtein}g (±${Math.round(totalProtein * 0.1)}g)
-- Total Daily Carbs: ${totalCarbs}g (±${Math.round(totalCarbs * 0.1)}g)
-- Total Daily Fat: ${totalFat}g (±${Math.round(totalFat * 0.1)}g)
+🎯 PRIORITY #1: DAILY CALORIE TARGET (MUST BE EXACT)
+- TOTAL DAILY CALORIES: ${totalCalories} (±${Math.round(totalCalories * 0.05)} calories = ±5% MAX)
+- Secondary targets: ${totalProtein}g protein, ${totalCarbs}g carbs, ${totalFat}g fat (±10% acceptable)
 
-MANDATORY MEAL STRUCTURE - Create these EXACT items in this order:
+🔥 CALORIE DISTRIBUTION STRATEGY:
+You have ${mealStructure.totalItems} items total. Individual meal calories can vary, but TOTAL must equal ${totalCalories}±${Math.round(totalCalories * 0.05)}.
+
+FLEXIBLE MEAL STRUCTURE - Create these items with VARIABLE sizing to hit daily target:
 ${mealTargets.map((meal, index) => `
 ${index + 1}. ${meal.name} (${meal.category.toUpperCase()})
    - Type: "${meal.type}"
    - Category: "${meal.category}"
-   - Target: ${meal.calories} cal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat
-   - VERIFY MATH: (${meal.protein}×4) + (${meal.carbs}×4) + (${meal.fat}×9) should equal ${meal.calories}
-   - Portion Guidelines: ${meal.category === 'meal' ? 'Full meal with multiple components' : 'Simple snack, 1-3 ingredients max'}`).join('')}
+   - SUGGESTED calories: ${meal.calories} (but adjust as needed to hit daily total)
+   - Portion Guidelines: ${meal.category === 'meal' ? 'Larger portions (200-1000 calories)' : 'Smaller portions (100-400 calories)'}
+   - Flexibility: Size this meal appropriately to help reach TOTAL ${totalCalories} calories`).join('')}
+
+CRITICAL CALORIE MATH:
+- Add up ALL ${mealStructure.totalItems} meals/snacks = MUST equal ${totalCalories} (±${Math.round(totalCalories * 0.05)})
+- Individual meals can be 150-800 calories (meals larger, snacks smaller)
+- Adjust portion sizes to make the TOTAL work perfectly
 
 MEAL vs SNACK REQUIREMENTS:
 
@@ -220,16 +226,19 @@ ${dietaryGuidance}
 ${userPrompt ? `SPECIAL REQUEST: ${userPrompt}` : ''}
 
 CRITICAL VALIDATION EXAMPLES:
-Example 1 - Greek Yogurt Snack (Target: 300 calories, 25g protein, 15g carbs, 10g fat):
-- 1 cup Greek yogurt: 130 cal, 23g protein, 9g carbs, 0g fat
-- 1/4 cup granola: 150 cal, 4g protein, 30g carbs, 6g fat  
-- 1 tbsp honey: 60 cal, 0g protein, 17g carbs, 0g fat
-TOTAL: 340 cal, 27g protein, 56g carbs, 6g fat
-VERIFICATION: (27×4) + (56×4) + (6×9) = 108 + 224 + 54 = 386 calories
-This doesn't match! Adjust portions to make math work.
+Example - 3 Meals + 2 Snacks for 2000 Calories:
+- Breakfast (meal): 500 calories
+- Morning Snack: 200 calories  
+- Lunch (meal): 600 calories
+- Afternoon Snack: 250 calories
+- Dinner (meal): 450 calories
+TOTAL: 500+200+600+250+450 = 2000 calories ✅
+
+YOU MUST CALCULATE: Meal1 + Meal2 + ... + MealN = ${totalCalories} (±${Math.round(totalCalories * 0.05)})
 
 Return response in this EXACT JSON format:
 {
+  "calorieCalculation": "Show your math: Meal1_cal + Meal2_cal + ... = TOTAL_cal",
   "meals": [
     {
       "name": "Specific Meal/Snack Name",
@@ -244,10 +253,10 @@ Return response in this EXACT JSON format:
         }
       ],
       "macros": {
-        "calories": exact_calculated_number,
-        "protein": exact_calculated_number,
-        "carbs": exact_calculated_number,
-        "fat": exact_calculated_number
+        "calories": flexible_number_to_hit_daily_target,
+        "protein": calculated_number,
+        "carbs": calculated_number,
+        "fat": calculated_number
       },
       "nutritionVerification": "Show your math: (protein×4) + (carbs×4) + (fat×9) = calories",
       "instructions": ["step 1", "step 2", "step 3"],
@@ -256,29 +265,30 @@ Return response in this EXACT JSON format:
     }
   ],
   "dailyTotals": {
-    "calories": sum_of_all_meals,
+    "calories": sum_of_all_meals_MUST_EQUAL_${totalCalories},
     "protein": sum_of_all_meals,
     "carbs": sum_of_all_meals,
     "fat": sum_of_all_meals
   },
-  "dailyTotalVerification": "Show math: (total_protein×4) + (total_carbs×4) + (total_fat×9) = total_calories",
+  "dailyTotalVerification": "Show math: Meal1 + Meal2 + ... = ${totalCalories} calories",
+  "calorieAccuracy": "Within ±5% of ${totalCalories}? YES/NO",
   "configurationCompliance": {
     "correctItemCount": true_or_false,
     "correctMealTypes": true_or_false,
-    "appropriatePortioning": true_or_false,
+    "hitCalorieTarget": true_or_false,
     "nutritionMathCorrect": true_or_false
   }
 }
 
-CRITICAL SUCCESS CRITERIA:
-1. Exactly ${mealStructure.totalItems} meals/snacks generated
-2. Each meal matches its assigned type and category
-3. Snacks are simple (1-3 ingredients), meals are complete (3-5 ingredients)
-4. Daily totals within ±10% of macro targets
-5. ALL NUTRITION MATH MUST BE CORRECT: (protein×4) + (carbs×4) + (fat×9) = calories
-6. All portions realistic and properly seasoned
+CRITICAL SUCCESS CRITERIA (IN ORDER OF PRIORITY):
+1. 🎯 DAILY CALORIES = ${totalCalories} (±${Math.round(totalCalories * 0.05)}) - THIS IS MANDATORY
+2. Exactly ${mealStructure.totalItems} meals/snacks generated
+3. Each meal matches its assigned type and category  
+4. Snacks are simple (1-3 ingredients), meals are complete (3-5 ingredients)
+5. Individual nutrition math correct: (protein×4) + (carbs×4) + (fat×9) = calories
+6. Protein/carbs/fat targets within ±10% (secondary priority)
 
-REJECT if you cannot meet these exact meal structure requirements OR if nutrition math is wrong.`;
+REJECT and start over if daily calories are not within ±5% of ${totalCalories}.`;
 
   return basePrompt;
 }
