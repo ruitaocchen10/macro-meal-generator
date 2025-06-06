@@ -27,6 +27,9 @@ export async function generateAIMeals(
   userPrompt?: string
 ): Promise<Meal[]> {
   try {
+    console.log('API Key exists:', !!process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY);
+    console.log('API Key length:', process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY?.length);
+    
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = buildFlexibleMealPrompt(macroGoals, filters, favoriteFoods, excludedFoods, userPrompt);
