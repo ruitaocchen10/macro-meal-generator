@@ -34,7 +34,7 @@ export const getMatchPercentage = (meal: Meal, macroGoals: MacroGoals): number |
   }
 
   const score = calculateMatchScore(meal, macroGoals);
-  const maxScore = 200; // Reasonable max difference
+  const maxScore = 200;
   const percentage = Math.max(0, Math.min(100, 100 - (score / maxScore) * 100));
   return Math.round(percentage);
 };
